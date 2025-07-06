@@ -447,4 +447,57 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.3s ease, opacity 0.5
+  transition: all 0.3s ease, opacity 0.5s ease;
+  opacity: 0;
+  animation: fadeIn 0.5s forwards 0.5s;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-50%) scale(0.8); }
+  to { opacity: 1; transform: translateY(-50%) scale(1); }
+}
+
+#msg-floating-icon:hover {
+  background-color: #B24D3E;
+  transform: translateY(-50%) scale(1.1);
+}
+
+#msg-floating-icon img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+
+#msg-floating-icon.dragging {
+  transform: none;
+  cursor: grabbing;
+}
+
+/* Fallback logo styles for header */
+.msg-logo-fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background-color: #B24D3E;
+  color: white;
+  border-radius: 50%;
+  font-weight: bold;
+  margin-right: 8px;
+  font-size: 14px;
+}
+
+/* Fallback icon styles for floating button */
+.msg-icon-fallback {
+  width: 32px;
+  height: 32px;
+  background-color: #D4A373;
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 18px;
+}

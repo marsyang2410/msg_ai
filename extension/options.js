@@ -123,4 +123,37 @@ document.addEventListener('DOMContentLoaded', function() {
         panelWidthSelect.value = result.msgSettings.panelWidth || 'medium';
         autoSummarizeCheckbox.checked = result.msgSettings.autoSummarize || false;
         enableGroundingCheckbox.checked = result.msgSettings.enableGrounding || false;
-        groundingModeSele
+        groundingModeSelect.value = result.msgSettings.groundingMode || 'auto';
+        
+        // Set initial visibility of grounding settings
+        groundingSettings.style.display = enableGroundingCheckbox.checked ? 'block' : 'none';
+      } else {
+        // Default state for grounding settings
+        groundingSettings.style.display = 'none';
+      }
+    });
+  }
+
+  // Update login state UI
+  function updateLoginState(userInfo) {
+    if (userInfo) {
+      loginStatus.style.display = 'none';
+      logoutSection.style.display = 'block';
+      userEmail.textContent = userInfo.email;
+    } else {
+      loginStatus.style.display = 'block';
+      logoutSection.style.display = 'none';
+    }
+  }
+
+  // Show status message
+  function showStatus(message, type) {
+    statusMessage.textContent = message;
+    statusMessage.className = 'status ' + type;
+    statusMessage.style.display = 'block';
+    
+    setTimeout(function() {
+      statusMessage.style.display = 'none';
+    }, 3000);
+  }
+});

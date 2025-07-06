@@ -43,4 +43,7 @@
   ],
   "options_page": "options.html",
   "oauth2": {
-    "client_id": "Y
+    "client_id": "YOUR_CLIENT_ID.apps.googleusercontent.com",
+    "scopes": ["https://www.googleapis.com/auth/userinfo.email"]
+  }
+}

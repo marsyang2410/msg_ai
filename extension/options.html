@@ -200,4 +200,25 @@
         </label>
       </div>
       <div class="form-group" id="grounding-settings">
-        <label>When to use grounding:</
+        <label>When to use grounding:</label>
+        <select id="grounding-mode">
+          <option value="auto">Automatic (when needed)</option>
+          <option value="always">Always</option>
+          <option value="explicit">Only when user asks</option>
+        </select>
+      </div>
+    </div>
+    
+    <div class="section">
+      <h2>Keyboard Shortcut</h2>
+      <p>Open/close MSG panel: Press <span class="shortcut-key">/</span> twice quickly</p>
+    </div>
+    
+    <div id="status-message" class="status" style="display: none;"></div>
+    
+    <button id="save-settings" class="button">Save All Settings</button>
+  </div>
+  
+  <script src="options.js"></script>
+</body>
+</html>

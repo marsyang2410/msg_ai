@@ -932,4 +932,223 @@ function addFloatingIcon() {
   
   // Add icon image
   try {
-    c
+    const logoURL = chrome.runtime.getURL('images/msg_logo.png');
+    const iconImg = document.createElement('img');
+    iconImg.src = logoURL;
+    iconImg.alt = 'MSG';
+    iconImg.onerror = function() {
+      console.error("Failed to load floating icon image");
+      // Create a fallback colored div with text instead of image
+      this.remove(); // Remove the broken image
+      createFallbackIcon(iconContainer);
+    };
+    iconContainer.appendChild(iconImg);
+    console.log("Using floating icon URL:", logoURL);
+  } catch (e) {
+    console.error("Error setting floating icon:", e);
+    createFallbackIcon(iconContainer);
+  }
+  
+  // Helper function to create a fallback icon
+  function createFallbackIcon(container) {
+    const fallbackIcon = document.createElement('div');
+    fallbackIcon.className = 'msg-icon-fallback';
+    fallbackIcon.textContent = 'M';
+    container.appendChild(fallbackIcon);
+  }
+  
+  // Add click handler to toggle chat panel
+  iconContainer.addEventListener('click', function(e) {
+    // If shift key is pressed while clicking, don't toggle panel
+    // This allows the user to drag the icon without opening the panel
+    if (!e.shiftKey) {
+      toggleChatPanel();
+    }
+  });
+  
+  // Make the icon draggable vertically
+  let isDragging = false;
+  let startY = 0;
+  let startTop = 0;
+  
+  iconContainer.addEventListener('mousedown', function(e) {
+    // Only enable dragging when shift key is pressed
+    if (e.shiftKey) {
+      isDragging = true;
+      startY = e.clientY;
+      const computedStyle = window.getComputedStyle(this);
+      startTop = parseInt(computedStyle.top) || window.innerHeight / 2; // Default to middle if not set
+      this.classList.add('dragging');
+      e.preventDefault(); // Prevent text selection while dragging
+    }
+  });
+  
+  // Add the icon container to the document body
+  document.body.appendChild(iconContainer);
+  
+  document.addEventListener('mousemove', function(e) {
+    if (isDragging) {
+      const newTop = startTop + (e.clientY - startY);
+      // Constrain to window boundaries
+      const maxTop = window.innerHeight - 40; // Icon height
+      const constrainedTop = Math.max(20, Math.min(newTop, maxTop));
+      iconContainer.style.top = constrainedTop + 'px';
+      
+      // Store position in localStorage
+      try {
+        localStorage.setItem('msgIconPosition', constrainedTop);
+      } catch (e) {
+        // Handle localStorage errors silently
+      }
+    }
+  });
+  
+  document.addEventListener('mouseup', function() {
+    if (isDragging) {
+      isDragging = false;
+      iconContainer.classList.remove('dragging');
+    }
+  });
+  
+  // Restore saved position if available
+  try {
+    const savedPosition = localStorage.getItem('msgIconPosition');
+    if (savedPosition) {
+      iconContainer.style.top = parseInt(savedPosition) + 'px';
+      // When using a specific top position, remove the default transform
+      iconContainer.style.transform = 'none';
+    }
+  } catch (e) {
+    // Handle localStorage errors silently
+  }
+  
+  // Append to document body only once
+  document.body.appendChild(iconContainer);
+  
+  // Mark icon as added
+  window.msgIconAdded = true;
+}
+
+// Set up resize handler for the chat panel
+function setupResizeHandler() {
+  const resizeHandle = document.querySelector('.msg-resize-handle');
+  if (!resizeHandle) return;
+  
+  let isResizing = false;
+  let initialX, initialWidth;
+  
+  // Mouse down on the resize handle
+  resizeHandle.addEventListener('mousedown', function(e) {
+    isResizing = true;
+    initialX = e.clientX;
+    initialWidth = parseInt(document.defaultView.getComputedStyle(chatPanel).width, 10);
+    
+    // Add active class for visual feedback
+    resizeHandle.classList.add('active');
+    
+    // Prevent text selection during resize
+    document.body.style.userSelect = 'none';
+    
+    // Store the starting size in localStorage
+    try {
+      localStorage.setItem('msgChatPanelWidth', initialWidth);
+    } catch (e) {
+      // Handle localStorage errors silently
+    }
+  });
+  
+  // Mouse move - handle the resizing
+  document.addEventListener('mousemove', function(e) {
+    if (!isResizing) return;
+    
+    // Calculate new width (note: resizing from right to left)
+    const newWidth = initialWidth + (initialX - e.clientX);
+    
+    // Apply constraints
+    const minWidth = 300; // Minimum width
+    const maxWidth = window.innerWidth * 0.8; // Maximum width (80% of viewport)
+    
+    if (newWidth >= minWidth && newWidth <= maxWidth) {
+      chatPanel.style.width = newWidth + 'px';
+      
+      // Store the new size in localStorage
+      try {
+        localStorage.setItem('msgChatPanelWidth', newWidth);
+      } catch (e) {
+        // Handle localStorage errors silently
+      }
+    }
+  });
+  
+  // Mouse up - stop resizing
+  document.addEventListener('mouseup', function() {
+    if (isResizing) {
+      isResizing = false;
+      resizeHandle.classList.remove('active');
+      document.body.style.userSelect = '';
+    }
+  });
+}
+
+// Restore saved panel width if available
+function restorePanelSize() {
+  if (chatPanel) {
+    try {
+      const savedWidth = localStorage.getItem('msgChatPanelWidth');
+      if (savedWidth) {
+        chatPanel.style.width = parseInt(savedWidth) + 'px';
+      }
+    } catch (e) {
+      // Handle localStorage errors silently
+    }
+  }
+}
+
+// Initialize everything
+function initialize() {
+  console.log("MSG: Initializing...");
+  
+  // Create chat panel if it doesn't exist
+  if (!document.getElementById('msg-chat-panel')) {
+    createChatPanel();
+  }
+  
+  // Add floating icon if it doesn't exist and not already added
+  if (!document.getElementById('msg-floating-icon') && !window.msgIconAdded) {
+    addFloatingIcon();
+  }
+  
+  // Set up keyboard event listener (remove any existing listeners first)
+  document.removeEventListener('keydown', handleKeyDown);
+  document.addEventListener('keydown', handleKeyDown);
+  
+  // Set up resize functionality
+  setupResizeHandler();
+}
+
+// Initialize when DOM is fully loaded
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', function() {
+    console.log("MSG: DOM Content Loaded");
+    initialize();
+  });
+} else {
+  console.log("MSG: Document already loaded");
+  initialize();
+}
+
+// Ensure the extension works even after dynamic page loads (SPAs)
+window.addEventListener('load', function() {
+  console.log("MSG: Window loaded");
+  if (!window.msgIconAdded) {
+    initialize();
+  }
+});
+
+// Reset variables when page is reloaded or closed
+window.addEventListener('beforeunload', function() {
+  // Reset state variables so a new session starts fresh
+  window.msgContextPrepared = false;
+  window.msgAutoSummarized = false;
+  window.msgPageInfo = null;
+});

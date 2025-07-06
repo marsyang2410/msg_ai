@@ -103,4 +103,82 @@ async function fetchGeminiResponse(messages, apiKey, enableGrounding, groundingM
     // Determine if grounding should be used based on mode
     const shouldGround = 
       groundingMode === 'always' || 
-      (groundingMode === 'auto' && shouldUseGroundingForQuery(filteredMessages[filteredMessages.length - 1]
+      (groundingMode === 'auto' && shouldUseGroundingForQuery(filteredMessages[filteredMessages.length - 1].content)) ||
+      (groundingMode === 'explicit' && explicitlyRequestedGrounding(filteredMessages[filteredMessages.length - 1].content));
+    
+    if (shouldGround) {
+      requestData.systemInstruction = {
+        parts: [{
+          text: "You are an AI assistant with web grounding capabilities. Use web searches to provide accurate, up-to-date information when answering questions. Cite your sources inline. For webpage content analysis, focus on the content provided by the user and only use grounding when questions extend beyond the provided content."
+        }]
+      };
+      
+      // Add the grounding config
+      requestData.tools = [{
+        googleSearchRetrieval: {
+          disableAttribution: false
+        }
+      }];
+    }
+  }
+  
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-goog-api-key': apiKey
+      },
+      body: JSON.stringify(requestData)
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error?.message || 'API request failed');
+    }
+    
+    const data = await response.json();
+    
+    // Extract the response text
+    if (data.candidates && data.candidates.length > 0 && 
+        data.candidates[0].content && data.candidates[0].content.parts && 
+        data.candidates[0].content.parts.length > 0) {
+      return data.candidates[0].content.parts[0].text;
+    } else {
+      throw new Error('Invalid response format from Gemini API');
+    }
+  } catch (error) {
+    console.error('Gemini API error:', error);
+    throw error;
+  }
+}
+
+// Helper function to determine if a query would benefit from grounding
+function shouldUseGroundingForQuery(query) {
+  // List of keywords that suggest the query would benefit from current information
+  const groundingKeywords = [
+    'current', 'latest', 'recent', 'today', 'news', 'update', 
+    'what is happening', 'this year', 'this month', 'this week',
+    'tell me about', 'who is', 'where is', 'when did', 'how many',
+    'search for', 'look up', 'find information', 'research',
+    'stock price', 'weather', 'event', 'fact check', 'verify'
+  ];
+  
+  // Check if any of the keywords are in the query
+  return groundingKeywords.some(keyword => 
+    query.toLowerCase().includes(keyword.toLowerCase())
+  );
+}
+
+// Helper function to check if the user explicitly requested grounding
+function explicitlyRequestedGrounding(query) {
+  const explicitGroundingPhrases = [
+    'search', 'look up', 'find online', 'google', 'web search',
+    'search the web', 'find information about', 'use grounding',
+    'check online', 'search for', 'use web search', 'search the internet'
+  ];
+  
+  return explicitGroundingPhrases.some(phrase => 
+    query.toLowerCase().includes(phrase.toLowerCase())
+  );
+}
