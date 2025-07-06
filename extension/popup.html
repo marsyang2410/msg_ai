@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>MSG: Chat with Any Websites</title>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="logo">
+        <img src="images/msg_logo.png" alt="MSG Logo">
+        <h1>MSG: Chat with Any Websites</h1>
+      </div>
+    </div>
+    
+    <div id="api-key-section" class="api-key-prompt">
+      <h2>Enter your Gemini API Key</h2>
+      <p>Your key stays secure on your device and is never shared.</p>
+      <input type="password" id="api-key-input" placeholder="Paste your Gemini API key here">
+      <button id="save-api-key" class="button">Save Key</button>
+      <a href="https://ai.google.dev/" target="_blank" class="settings-link">Get a Gemini API key</a>
+    </div>
+    
+    <div id="login-section">
+      <p>Sign in with Google for additional features (optional):</p>
+      <button id="login-button" class="button">Sign in with Google</button>
+    </div>
+    
+    <div class="shortcut-info">
+      <p>Press <span class="shortcut-key">/</span> twice quickly to open MSG on any website</p>
+    </div>
+    
+    <div class="status" id="status-message"></div>
+    
+    <a href="options.html" class="settings-link">Advanced Settings</a>
+  </div>
+  
+  <script src="popup.js"></script>
+</body>
+</html>

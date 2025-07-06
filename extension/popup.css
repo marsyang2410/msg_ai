@@ -1,0 +1,127 @@
+:root {
+  --msg-brown: #836953;
+  --msg-gold: #D4A373;
+  --msg-red: #B24D3E;
+  --msg-orange: #FFBB66;
+  --msg-beige: #F6E7D7;
+  --msg-gray: #D9D9D9;
+  --font-main: 'Nunito', 'Quicksand', sans-serif;
+}
+
+body {
+  font-family: var(--font-main);
+  margin: 0;
+  padding: 0;
+  width: 320px;
+  background-color: var(--msg-beige);
+  color: var(--msg-brown);
+}
+
+.container {
+  padding: 16px;
+}
+
+/* Header styles */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--msg-gold);
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+}
+
+.logo img {
+  width: 32px;
+  height: 32px;
+  margin-right: 8px;
+}
+
+.logo h1 {
+  font-size: 18px;
+  margin: 0;
+  color: var(--msg-brown);
+}
+
+/* Button styles */
+.button {
+  background-color: var(--msg-gold);
+  color: white;
+  border: none;
+  border-radius: 20px;
+  padding: 8px 16px;
+  font-family: var(--font-main);
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.button:hover {
+  background-color: var(--msg-red);
+}
+
+/* Settings link */
+.settings-link {
+  color: var(--msg-red);
+  text-decoration: none;
+  font-size: 14px;
+  display: block;
+  margin-top: 16px;
+  text-align: center;
+}
+
+.settings-link:hover {
+  color: var(--msg-brown);
+}
+
+/* API key prompt */
+.api-key-prompt {
+  background-color: white;
+  border-radius: 8px;
+  padding: 16px;
+  margin: 16px 0;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.api-key-prompt h2 {
+  font-size: 16px;
+  margin-top: 0;
+  color: var(--msg-brown);
+}
+
+.api-key-prompt input {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid var(--msg-gray);
+  border-radius: 4px;
+  margin: 8px 0;
+  font-family: var(--font-main);
+}
+
+/* Status message */
+.status {
+  text-align: center;
+  margin: 16px 0;
+  font-size: 14px;
+}
+
+/* Shortcut info */
+.shortcut-info {
+  background-color: rgba(255, 187, 102, 0.2);
+  border-radius: 8px;
+  padding: 12px;
+  margin-top: 16px;
+  text-align: center;
+  font-size: 14px;
+}
+
+.shortcut-key {
+  background-color: var(--msg-gray);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: bold;
+}
