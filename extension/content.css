@@ -1,309 +1,455 @@
+/* CSS Reset for MSG elements to prevent website styles from affecting the extension */
+#msg-chat-panel,
+#msg-floating-icon {
+  all: initial;
+  box-sizing: border-box !important;
+  text-shadow: none !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif !important;
+}
+
+/* Size constraints for the panel */
 #msg-chat-panel {
-  position: fixed;
-  right: 0;
-  top: 0;
-  width: 380px;
-  height: 100vh;
-  background-color: rgba(246, 231, 215, 0.95);
-  box-shadow: -2px 0 10px rgba(0, 0, 0, 0.15);
-  z-index: 9999;
-  font-family: 'Nunito', 'Quicksand', sans-serif;
-  display: flex;
-  flex-direction: column;
-  transition: transform 0.3s ease-in-out;
-  transform: translateX(100%);
-  border-left: 2px solid #D4A373;
-  resize: horizontal;
-  overflow: hidden;
-  min-width: 300px;
-  max-width: 80vw;
+  overflow: hidden !important;
+  min-width: 300px !important;
+  max-width: 80vw !important;
 }
 
-.msg-resize-handle {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 6px;
-  height: 100%;
-  cursor: ew-resize;
-  background-color: transparent;
-  transition: background-color 0.2s;
-  z-index: 10000;
+/* Reset specific properties but not all properties to maintain formatting */
+#msg-chat-panel *,
+#msg-floating-icon * {
+  box-sizing: border-box !important;
+  text-shadow: none !important;
+  margin: 0;
+  padding: 0;
 }
 
-.msg-resize-handle::before {
-  content: "";
-  position: absolute;
-  left: 2px;
-  top: 50%;
-  height: 30px;
-  width: 2px;
-  background-color: #D4A373;
-  transform: translateY(-50%);
-  opacity: 0;
-  transition: opacity 0.2s;
+/* Reset specific element styles that might be influenced by website CSS */
+#msg-chat-panel button,
+#msg-chat-panel input,
+#msg-chat-panel textarea,
+#msg-chat-panel div,
+#msg-chat-panel span,
+#msg-chat-panel p,
+#msg-chat-panel h1,
+#msg-chat-panel h2,
+#msg-chat-panel h3,
+#msg-chat-panel ul,
+#msg-chat-panel ol,
+#msg-chat-panel li,
+#msg-chat-panel a,
+#msg-chat-panel code,
+#msg-chat-panel pre,
+#msg-chat-panel blockquote {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif !important;
+  color: inherit !important;
 }
 
-.msg-resize-handle:hover,
-.msg-resize-handle.active {
-  background-color: rgba(212, 163, 115, 0.5);
+#msg-chat-panel {
+  position: fixed !important;
+  right: 0 !important;
+  top: 0 !important;
+  width: 380px; /* Default width - removed !important to allow JS resizing */
+  height: 100vh !important;
+  background-color: rgba(246, 231, 215, 0.95) !important;
+  box-shadow: -2px 0 10px rgba(0, 0, 0, 0.15) !important;
+  z-index: 2147483647 !important; /* Maximum z-index value */
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif !important;
+  display: flex !important;
+  flex-direction: column !important;
+  transition: transform 0.3s ease-in-out !important; /* ONLY transform transition, not width */
+  transform: translateX(100%) !important;
+  border-left: 2px solid #D4A373 !important;
+  overflow: hidden !important;
+  min-width: 300px !important; 
+  max-width: 80vw; /* Removed !important to allow dynamic resizing */
+  color: #333 !important;
+  font-size: 14px !important;
+  box-sizing: border-box !important;
+  user-select: none !important; /* Keep this for UI elements like header, but override for content areas */
+  will-change: transform, width !important; /* Optimize for animations */
 }
 
-.msg-resize-handle:hover::before,
-.msg-resize-handle.active::before {
-  opacity: 1;
+/* Specifically target header and control elements to prevent selection */
+#msg-chat-panel .msg-panel-header,
+#msg-chat-panel .msg-close-btn,
+#msg-chat-panel .msg-send-btn,
+#msg-chat-panel .msg-resize-handle {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+
+#msg-chat-panel .msg-resize-handle {
+  position: absolute !important;
+  left: 0 !important;
+  top: 0 !important;
+  width: 10px !important; /* Wide enough for easy grabbing */
+  height: 100% !important;
+  cursor: ew-resize !important;
+  background-color: rgba(212, 163, 115, 0.4) !important; /* More visible for debugging */
+  z-index: 2147483640 !important; /* Ensure it's above other elements but below panel */
+  pointer-events: auto !important;
+  touch-action: none !important; /* Disable touch scrolling during resize */
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  outline: 0 !important;
+  -webkit-user-select: none !important;
+  user-select: none !important;
+}
+
+#msg-chat-panel .msg-resize-handle::before {
+  content: "" !important;
+  position: absolute !important;
+  left: 3px !important; /* Centered in the handle */
+  top: 50% !important;
+  height: 60px !important; /* Taller for better visibility */
+  width: 3px !important; /* Slightly thicker */
+  background-color: #D4A373 !important;
+  transform: translateY(-50%) !important;
+  opacity: 0.4 !important; /* Always slightly visible */
+  transition: opacity 0.2s !important;
+  border-radius: 1.5px !important;
+}
+
+#msg-chat-panel .msg-resize-handle:hover,
+#msg-chat-panel .msg-resize-handle.active {
+  background-color: rgba(212, 163, 115, 0.5) !important;
+  width: 6px !important;
+}
+
+#msg-chat-panel .msg-resize-handle:hover::before,
+#msg-chat-panel .msg-resize-handle.active::before {
+  opacity: 1 !important;
+  width: 3px !important;
+}
+
+.msg-resize-overlay {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  z-index: 2147483646 !important; /* Just below the chatPanel */
+  cursor: ew-resize !important;
+  user-select: none !important;
+  background-color: transparent !important; /* Invisible but captures mouse events */
 }
 
 #msg-chat-panel.visible {
-  transform: translateX(0);
+  transform: translateX(0) !important;
 }
 
-.msg-panel-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 16px;
-  background-color: #D4A373;
-  color: white;
+#msg-chat-panel .msg-panel-header {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  padding: 12px 16px !important;
+  background-color: #D4A373 !important;
+  color: white !important;
+  font-size: 16px !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif !important;
 }
 
-.msg-panel-title {
-  display: flex;
-  align-items: center;
-  font-weight: bold;
-  font-size: 16px;
+#msg-chat-panel .msg-panel-title {
+  display: flex !important;
+  align-items: center !important;
+  font-weight: bold !important;
+  font-size: 16px !important;
+  color: white !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif !important;
 }
 
-.msg-panel-title img {
-  width: 24px;
-  height: 24px;
-  margin-right: 8px;
-  object-fit: contain;
+#msg-chat-panel .msg-panel-title img {
+  width: 24px !important;
+  height: 24px !important;
+  margin-right: 8px !important;
+  object-fit: contain !important;
 }
 
-.msg-close-btn {
-  background: none;
-  border: none;
-  color: white;
-  cursor: pointer;
-  font-size: 18px;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
+#msg-chat-panel .msg-close-btn {
+  background: none !important;
+  border: none !important;
+  color: white !important;
+  cursor: pointer !important;
+  font-size: 18px !important;
+  padding: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 24px !important;
+  height: 24px !important;
+  border-radius: 50% !important;
 }
 
-.msg-close-btn:hover {
-  background-color: rgba(255, 255, 255, 0.2);
+#msg-chat-panel .msg-close-btn:hover {
+  background-color: rgba(255, 255, 255, 0.2) !important;
 }
 
-.msg-chat-container {
-  flex: 1;
-  overflow-y: auto;
-  padding: 16px;
+#msg-chat-panel .msg-chat-container {
+  flex: 1 !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important; /* Prevent horizontal overflow */
+  padding: 16px !important;
+  background-color: rgba(246, 231, 215, 0.95) !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif !important;
+  width: 100% !important; /* Take up full width of the panel */
+  box-sizing: border-box !important;
+  user-select: text !important; /* Enable text selection for the entire chat container */
+  -webkit-user-select: text !important;
 }
 
-.msg-message {
-  margin-bottom: 16px;
-  max-width: 85%;
-  border-radius: 12px;
-  padding: 10px 14px;
-  line-height: 1.4;
-  word-wrap: break-word;
-  overflow-wrap: break-word;
+#msg-chat-panel .msg-message {
+  margin-bottom: 16px !important;
+  max-width: 85% !important;
+  border-radius: 12px !important;
+  padding: 10px 14px !important;
+  line-height: 1.4 !important;
+  word-wrap: break-word !important;
+  overflow-wrap: break-word !important;
+  font-size: 14px !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif !important;
+  display: block !important;
+  text-align: left !important;
+  user-select: text !important; /* Enable text selection in all messages */
+  -webkit-user-select: text !important;
 }
 
-.msg-user-message {
-  background-color: #B24D3E;
-  color: white;
-  align-self: flex-end;
-  margin-left: auto;
+#msg-chat-panel .msg-user-message {
+  background-color: #B24D3E !important;
+  color: white !important;
+  align-self: flex-end !important;
+  margin-left: auto !important;
+  font-size: 14px !important;
 }
 
-.msg-assistant-message {
-  background-color: #D9D9D9;
-  color: #333;
-  font-size: 14px;
+#msg-chat-panel .msg-assistant-message {
+  background-color: #D9D9D9 !important;
+  color: #333 !important;
+  font-size: 14px !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif !important;
+  line-height: 1.4 !important;
 }
 
-/* Formatted content styles */
-.msg-assistant-message a {
-  color: #B24D3E;
-  text-decoration: none;
-  border-bottom: 1px solid #B24D3E;
+/* Formatted content styles - with increased specificity */
+#msg-chat-panel .msg-assistant-message a,
+#msg-chat-panel .msg-message.msg-assistant-message a {
+  color: #B24D3E !important;
+  text-decoration: none !important;
+  border-bottom: 1px solid #B24D3E !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif !important;
+  font-size: 14px !important;
+  display: inline !important;
 }
 
-.msg-assistant-message a:hover {
-  opacity: 0.8;
+#msg-chat-panel .msg-assistant-message a:hover {
+  opacity: 0.8 !important;
 }
 
-.msg-assistant-message strong {
-  font-weight: bold;
-  color: #000;
+#msg-chat-panel .msg-assistant-message strong {
+  font-weight: bold !important;
+  color: #000 !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif !important;
 }
 
-.msg-assistant-message em {
-  font-style: italic;
+#msg-chat-panel .msg-assistant-message em {
+  font-style: italic !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif !important;
 }
 
-.msg-assistant-message code {
-  font-family: 'Courier New', monospace;
-  background-color: rgba(0, 0, 0, 0.05);
-  padding: 2px 4px;
-  border-radius: 3px;
-  font-size: 0.9em;
+#msg-chat-panel .msg-assistant-message code {
+  font-family: 'Courier New', monospace !important;
+  background-color: rgba(0, 0, 0, 0.05) !important;
+  padding: 2px 4px !important;
+  border-radius: 3px !important;
+  font-size: 0.9em !important;
 }
 
-.msg-assistant-message pre {
-  background-color: rgba(0, 0, 0, 0.05);
-  padding: 10px;
-  border-radius: 5px;
-  overflow-x: auto;
-  margin: 8px 0;
+#msg-chat-panel .msg-assistant-message pre {
+  background-color: rgba(0, 0, 0, 0.05) !important;
+  padding: 10px !important;
+  border-radius: 5px !important;
+  overflow-x: auto !important;
+  margin: 8px 0 !important;
 }
 
-.msg-assistant-message pre code {
-  background-color: transparent;
-  padding: 0;
-  font-size: 0.9em;
-  white-space: pre-wrap;
+#msg-chat-panel .msg-assistant-message pre code {
+  background-color: transparent !important;
+  padding: 0 !important;
+  font-size: 0.9em !important;
+  white-space: pre-wrap !important;
+  font-family: 'Courier New', monospace !important;
 }
 
-.msg-assistant-message ul, 
-.msg-assistant-message ol {
-  margin: 8px 0 14px 0;
-  padding-left: 20px;
+#msg-chat-panel .msg-assistant-message ul, 
+#msg-chat-panel .msg-assistant-message ol {
+  margin: 8px 0 14px 0 !important;
+  padding-left: 20px !important;
+  list-style-position: outside !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif !important;
 }
 
-.msg-assistant-message ul li::before {
-  content: "•";
-  position: absolute;
-  left: -15px;
-  color: #D4A373;
-  font-weight: bold;
+#msg-chat-panel .msg-assistant-message ul li {
+  margin-bottom: 6px !important;
+  position: relative !important;
+  padding-left: 20px !important;
+  list-style-type: none !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif !important;
+  font-size: 14px !important;
+  display: list-item !important;
+  text-align: left !important;
 }
 
-.msg-assistant-message li {
-  margin-bottom: 6px;
-  position: relative;
-  padding-left: 5px;
+#msg-chat-panel .msg-assistant-message ul li::before {
+  content: "•" !important;
+  position: absolute !important;
+  left: 5px !important;
+  color: #D4A373 !important;
+  font-weight: bold !important;
+  display: inline-block !important;
+  width: 10px !important;
 }
 
-.msg-assistant-message h1, 
-.msg-assistant-message h2, 
-.msg-assistant-message h3 {
-  margin: 12px 0 8px 0;
-  font-weight: bold;
-  color: #000;
-  line-height: 1.3;
+#msg-chat-panel .msg-assistant-message ol li {
+  margin-bottom: 6px !important;
+  position: relative !important;
+  padding-left: 5px !important;
+  list-style-type: decimal !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif !important;
+  font-size: 14px !important;
 }
 
-.msg-assistant-message h1 {
-  font-size: 1.3em;
-  border-bottom: 2px solid #D4A373;
-  padding-bottom: 5px;
-  margin-bottom: 12px;
+#msg-chat-panel .msg-assistant-message h1, 
+#msg-chat-panel .msg-assistant-message h2, 
+#msg-chat-panel .msg-assistant-message h3 {
+  margin: 12px 0 8px 0 !important;
+  font-weight: bold !important;
+  color: #000 !important;
+  line-height: 1.3 !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif !important;
 }
 
-.msg-assistant-message h2 {
-  font-size: 1.2em;
-  border-left: 3px solid #D4A373;
-  padding-left: 8px;
-  margin-top: 16px;
+#msg-chat-panel .msg-assistant-message h1 {
+  font-size: 1.3em !important;
+  border-bottom: 2px solid #D4A373 !important;
+  padding-bottom: 5px !important;
+  margin-bottom: 12px !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif !important;
 }
 
-.msg-assistant-message h3 {
-  font-size: 1.1em;
+#msg-chat-panel .msg-assistant-message h2 {
+  font-size: 1.2em !important;
+  border-left: 3px solid #D4A373 !important;
+  padding-left: 8px !important;
+  margin-top: 16px !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif !important;
 }
 
-.msg-assistant-message p {
-  margin: 0 0 8px 0;
+#msg-chat-panel .msg-assistant-message h3 {
+  font-size: 1.1em !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif !important;
 }
 
-.msg-assistant-message blockquote {
-  border-left: 3px solid #D4A373;
-  padding-left: 10px;
-  margin: 8px 0 8px 10px;
-  color: #666;
-  font-style: italic;
+#msg-chat-panel .msg-assistant-message p {
+  margin: 0 0 8px 0 !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif !important;
+  font-size: 14px !important;
+  line-height: 1.4 !important;
+  color: #333 !important;
+  white-space: pre-wrap !important;
+  display: block !important;
 }
 
-.msg-input-container {
-  display: flex;
-  padding: 12px 16px;
-  border-top: 1px solid #D4A373;
-  background-color: white;
+#msg-chat-panel .msg-assistant-message blockquote {
+  border-left: 3px solid #D4A373 !important;
+  padding-left: 10px !important;
+  margin: 8px 0 8px 10px !important;
+  color: #666 !important;
+  font-style: italic !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif !important;
 }
 
-.msg-input {
-  flex: 1;
-  border: 1px solid #D9D9D9;
-  border-radius: 20px;
-  padding: 10px 16px;
-  font-family: 'Nunito', 'Quicksand', sans-serif;
-  font-size: 14px;
-  resize: none;
-  height: 20px;
-  max-height: 120px;
-  overflow-y: auto;
+#msg-chat-panel .msg-input-container {
+  display: flex !important;
+  padding: 12px 16px !important;
+  border-top: 1px solid #D4A373 !important;
+  background-color: white !important;
+  align-items: center !important; /* Vertically center the input and button */
 }
 
-.msg-input:focus {
-  outline: none;
-  border-color: #D4A373;
+#msg-chat-panel .msg-input {
+  flex: 1 !important;
+  border: 1px solid #D9D9D9 !important;
+  border-radius: 20px !important;
+  padding: 10px 16px !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif !important;
+  font-size: 14px !important;
+  resize: none !important;
+  min-height: 20px !important; /* Changed height to min-height */
+  height: 36px !important; /* Match button height for better alignment */
+  max-height: 120px !important;
+  overflow-y: auto !important;
+  background-color: white !important;
+  color: #333 !important;
+  line-height: 1.4 !important; /* Consistent line height */
+  box-sizing: border-box !important; /* Ensure padding is included in height */
+  user-select: text !important; /* Enable text selection in the input field */
+  -webkit-user-select: text !important; /* For Safari compatibility */
 }
 
-.msg-send-btn {
-  background-color: #D4A373;
-  color: white;
-  border: none;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  margin-left: 8px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+#msg-chat-panel .msg-input:focus {
+  outline: none !important;
+  border-color: #D4A373 !important;
 }
 
-.msg-send-btn:hover {
-  background-color: #B24D3E;
+#msg-chat-panel .msg-send-btn {
+  background-color: #D4A373 !important;
+  color: white !important;
+  border: none !important;
+  width: 36px !important;
+  height: 36px !important;
+  border-radius: 50% !important;
+  margin-left: 8px !important;
+  cursor: pointer !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 16px !important;
 }
 
-.msg-loading {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px 0;
+#msg-chat-panel .msg-send-btn:hover {
+  background-color: #B24D3E !important;
 }
 
-.msg-loading-dots {
-  display: flex;
+#msg-chat-panel .msg-loading {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 20px 0 !important;
 }
 
-.msg-loading-dot {
-  width: 8px;
-  height: 8px;
-  margin: 0 4px;
-  border-radius: 50%;
-  background-color: #D4A373;
-  animation: msg-dot-pulse 1.4s infinite ease-in-out;
+#msg-chat-panel .msg-loading-dots {
+  display: flex !important;
 }
 
-.msg-loading-dot:nth-child(1) {
-  animation-delay: 0s;
+#msg-chat-panel .msg-loading-dot {
+  width: 8px !important;
+  height: 8px !important;
+  margin: 0 4px !important;
+  border-radius: 50% !important;
+  background-color: #D4A373 !important;
+  animation: msg-dot-pulse 1.4s infinite ease-in-out !important;
 }
 
-.msg-loading-dot:nth-child(2) {
-  animation-delay: 0.2s;
+#msg-chat-panel .msg-loading-dot:nth-child(1) {
+  animation-delay: 0s !important;
 }
 
-.msg-loading-dot:nth-child(3) {
-  animation-delay: 0.4s;
+#msg-chat-panel .msg-loading-dot:nth-child(2) {
+  animation-delay: 0.2s !important;
+}
+
+#msg-chat-panel .msg-loading-dot:nth-child(3) {
+  animation-delay: 0.4s !important;
 }
 
 @keyframes msg-dot-pulse {
@@ -316,14 +462,14 @@
 }
 
 /* Shimmer effect for loading */
-.msg-shimmer {
-  background: linear-gradient(90deg, #F6E7D7 0%, #D9D9D9 50%, #F6E7D7 100%);
-  background-size: 200% 100%;
-  animation: msg-shimmer 1.5s infinite;
-  border-radius: 8px;
-  height: 60px;
-  width: 80%;
-  margin-bottom: 10px;
+#msg-chat-panel .msg-shimmer {
+  background: linear-gradient(90deg, #F6E7D7 0%, #D9D9D9 50%, #F6E7D7 100%) !important;
+  background-size: 200% 100% !important;
+  animation: msg-shimmer 1.5s infinite !important;
+  border-radius: 8px !important;
+  height: 60px !important;
+  width: 80% !important;
+  margin-bottom: 10px !important;
 }
 
 @keyframes msg-shimmer {
@@ -338,166 +484,185 @@
 /* Dark mode adjustments */
 @media (prefers-color-scheme: dark) {
   #msg-chat-panel {
-    background-color: rgba(51, 51, 51, 0.95);
-    border-left: 2px solid #D4A373;
+    background-color: rgba(51, 51, 51, 0.95) !important;
+    border-left: 2px solid #D4A373 !important;
   }
   
-  .msg-assistant-message {
-    background-color: #555;
-    color: #f0f0f0;
+  #msg-chat-panel .msg-chat-container {
+    background-color: rgba(51, 51, 51, 0.95) !important;
+    user-select: text !important; /* Ensure text selection works in dark mode too */
+    -webkit-user-select: text !important;
   }
   
-  .msg-input-container {
-    background-color: #444;
+  #msg-chat-panel .msg-assistant-message {
+    background-color: #555 !important;
+    color: #f0f0f0 !important;
   }
   
-  .msg-input {
-    background-color: #333;
-    color: #f0f0f0;
-    border-color: #555;
+  #msg-chat-panel .msg-input-container {
+    background-color: #444 !important;
   }
   
-  .msg-resize-handle:hover,
-  .msg-resize-handle.active {
-    background-color: rgba(212, 163, 115, 0.5);
+  #msg-chat-panel .msg-input {
+    background-color: #333 !important;
+    color: #f0f0f0 !important;
+    border-color: #555 !important;
+    user-select: text !important; /* Enable text selection in dark mode too */
+    -webkit-user-select: text !important;
+  }
+  
+  #msg-chat-panel .msg-resize-handle:hover,
+  #msg-chat-panel .msg-resize-handle.active {
+    background-color: rgba(212, 163, 115, 0.5) !important;
   }
   
   /* Dark mode for formatted content */
-  .msg-assistant-message a {
-    color: #F6E7D7;
-    border-bottom-color: #F6E7D7;
+  #msg-chat-panel .msg-assistant-message a {
+    color: #F6E7D7 !important;
+    border-bottom-color: #F6E7D7 !important;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif !important;
   }
   
-  .msg-assistant-message strong {
-    color: #F6E7D7;
+  #msg-chat-panel .msg-assistant-message strong {
+    color: #F6E7D7 !important;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif !important;
+    font-weight: bold !important;
   }
   
-  .msg-assistant-message code {
-    background-color: rgba(255, 255, 255, 0.1);
+  #msg-chat-panel .msg-assistant-message code {
+    background-color: rgba(255, 255, 255, 0.1) !important;
+    font-family: 'Courier New', monospace !important;
   }
   
-  .msg-assistant-message pre {
-    background-color: rgba(255, 255, 255, 0.1);
+  #msg-chat-panel .msg-assistant-message pre {
+    background-color: rgba(255, 255, 255, 0.1) !important;
+    font-family: 'Courier New', monospace !important;
   }
   
-  .msg-assistant-message h1, 
-  .msg-assistant-message h2, 
-  .msg-assistant-message h3 {
-    color: #F6E7D7;
+  #msg-chat-panel .msg-assistant-message h1, 
+  #msg-chat-panel .msg-assistant-message h2, 
+  #msg-chat-panel .msg-assistant-message h3 {
+    color: #F6E7D7 !important;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif !important;
+    font-weight: bold !important;
   }
   
-  .msg-assistant-message h1 {
-    border-bottom-color: #D4A373;
+  #msg-chat-panel .msg-assistant-message h1 {
+    border-bottom-color: #D4A373 !important;
+    font-size: 1.3em !important;
   }
   
-  .msg-assistant-message h2 {
-    border-left-color: #D4A373;
+  #msg-chat-panel .msg-assistant-message h2 {
+    border-left-color: #D4A373 !important;
+    font-size: 1.2em !important;
   }
   
-  .msg-assistant-message ul li::before {
-    color: #D4A373;
+  #msg-chat-panel .msg-assistant-message ul li::before {
+    color: #D4A373 !important;
   }
   
-  .msg-assistant-message blockquote {
-    border-color: #D4A373;
-    color: #aaa;
+  #msg-chat-panel .msg-assistant-message blockquote {
+    border-color: #D4A373 !important;
+    color: #aaa !important;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif !important;
+    font-style: italic !important;
   }
 }
 
-.msg-grounding-indicator {
-  display: inline-block;
-  margin-left: 8px;
-  font-size: 12px;
-  background-color: #4285F4;
-  color: white;
-  padding: 2px 6px;
-  border-radius: 10px;
-  opacity: 0.9;
+#msg-chat-panel .msg-grounding-indicator {
+  display: inline-block !important;
+  margin-left: 8px !important;
+  font-size: 12px !important;
+  background-color: #4285F4 !important;
+  color: white !important;
+  padding: 2px 6px !important;
+  border-radius: 10px !important;
+  opacity: 0.9 !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif !important;
 }
 
-.msg-message-grounded {
-  border-left: 3px solid #4285F4;
+#msg-chat-panel .msg-message-grounded {
+  border-left: 3px solid #4285F4 !important;
 }
 
-.msg-message .msg-source-link {
-  display: inline-block;
-  font-size: 12px;
-  margin-top: 4px;
-  color: #4285F4;
-  text-decoration: underline;
+#msg-chat-panel .msg-message .msg-source-link {
+  display: inline-block !important;
+  font-size: 12px !important;
+  margin-top: 4px !important;
+  color: #4285F4 !important;
+  text-decoration: underline !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif !important;
 }
 
-.msg-message .msg-source-link:hover {
-  color: #3367D6;
+#msg-chat-panel .msg-message .msg-source-link:hover {
+  color: #3367D6 !important;
 }
 
 /* Floating Icon */
 #msg-floating-icon {
-  position: fixed;
-  right: 20px;
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 9998;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background-color: #D4A373;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.3s ease, opacity 0.5s ease;
-  opacity: 0;
-  animation: fadeIn 0.5s forwards 0.5s;
+  position: fixed !important;
+  right: 20px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  z-index: 2147483646 !important; /* One less than max to ensure chat panel is above */
+  width: 40px !important;
+  height: 40px !important;
+  border-radius: 50% !important;
+  background-color: #D4A373 !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2) !important;
+  cursor: pointer !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: all 0.3s ease, opacity 0.5s ease !important;
+  opacity: 1 !important; /* Changed from 0 to 1 to make it visible by default */
+  pointer-events: auto !important;
 }
 
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(-50%) scale(0.8); }
-  to { opacity: 1; transform: translateY(-50%) scale(1); }
-}
-
+/* Removed potentially problematic animation */
 #msg-floating-icon:hover {
-  background-color: #B24D3E;
-  transform: translateY(-50%) scale(1.1);
+  background-color: #B24D3E !important;
+  transform: translateY(-50%) scale(1.1) !important;
 }
 
 #msg-floating-icon img {
-  width: 24px;
-  height: 24px;
-  object-fit: contain;
+  width: 24px !important;
+  height: 24px !important;
+  object-fit: contain !important;
 }
 
 #msg-floating-icon.dragging {
-  transform: none;
-  cursor: grabbing;
+  transform: none !important;
+  cursor: grabbing !important;
 }
 
 /* Fallback logo styles for header */
-.msg-logo-fallback {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  background-color: #B24D3E;
-  color: white;
-  border-radius: 50%;
-  font-weight: bold;
-  margin-right: 8px;
-  font-size: 14px;
+#msg-chat-panel .msg-logo-fallback {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 24px !important;
+  height: 24px !important;
+  background-color: #B24D3E !important;
+  color: white !important;
+  border-radius: 50% !important;
+  font-weight: bold !important;
+  margin-right: 8px !important;
+  font-size: 14px !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif !important;
 }
 
 /* Fallback icon styles for floating button */
-.msg-icon-fallback {
-  width: 32px;
-  height: 32px;
-  background-color: #D4A373;
-  color: white;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: bold;
-  font-size: 18px;
+#msg-floating-icon .msg-icon-fallback {
+  width: 32px !important;
+  height: 32px !important;
+  background-color: #D4A373 !important;
+  color: white !important;
+  border-radius: 50% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-weight: bold !important;
+  font-size: 18px !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif !important;
 }

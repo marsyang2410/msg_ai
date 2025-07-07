@@ -61,6 +61,12 @@ function createChatPanel() {
   chatPanel = document.createElement('div');
   chatPanel.id = 'msg-chat-panel';
   
+  // Explicitly set initial width and style
+  chatPanel.style.setProperty('width', '380px', 'important');
+  chatPanel.style.setProperty('min-width', '300px', 'important');
+  chatPanel.style.setProperty('max-width', '80vw', 'important');
+  chatPanel.style.setProperty('resize', 'none', 'important');
+  
   // Add resize handle
   const resizeHandle = document.createElement('div');
   resizeHandle.className = 'msg-resize-handle';
@@ -130,11 +136,19 @@ function createChatPanel() {
       sendMessage();
     }
     
-    // Auto-resize textarea
+    // Auto-resize textarea with minimum height matching the button
     setTimeout(() => {
-      inputField.style.height = 'auto';
-      inputField.style.height = Math.min(inputField.scrollHeight, 120) + 'px';
+      inputField.style.height = '36px'; // Reset to default height (matches button)
+      const newHeight = Math.max(36, Math.min(inputField.scrollHeight, 120));
+      inputField.style.height = newHeight + 'px';
     }, 0);
+  });
+  
+  // Also handle input event for dynamic resizing while typing
+  inputField.addEventListener('input', function() {
+    inputField.style.height = '36px'; // Reset to default height
+    const newHeight = Math.max(36, Math.min(inputField.scrollHeight, 120));
+    inputField.style.height = newHeight + 'px';
   });
   
   sendButton = document.createElement('button');
@@ -150,11 +164,20 @@ function createChatPanel() {
   chatPanel.appendChild(chatContainer);
   chatPanel.appendChild(inputContainer);
   
-  // Add to document
+  // Add to document - use this approach to ensure our styles take precedence
   document.body.appendChild(chatPanel);
   
+  // Force a redraw/reflow to ensure all styles are applied
+  void chatPanel.offsetHeight;
+  
   // Restore saved panel width if available
-  restorePanelSize();
+  setTimeout(() => {
+    // Small delay to ensure the panel is fully rendered
+    restorePanelSize();
+    
+    // Force setup of resize handler after sizes are properly initialized
+    setupResizeHandler();
+  }, 100);
 }
 
 // Toggle chat panel visibility
@@ -260,7 +283,7 @@ function toggleChatPanel() {
 
 // Create system message for the LLM
 function createSystemMessage(pageInfo) {
-  return `You are MSG, a helpful AI assistant for webpage content.
+  return `You are MSG, a helpful AI assistant for user to understand the content of a webpage.
 
 PAGE INFO:
 Title: "${pageInfo.title}"
@@ -274,7 +297,7 @@ INSTRUCTIONS:
 2. Never ask for URLs or text - you already have everything.
 3. Your task is to understand the content of the webpage and allow user to ask questions about it.
 4. You may have access to web search (grounding) capabilities to answer questions that go beyond the content on the page. If you use this, cite your sources.
-5. For summaries, follow this EXACT format structure:
+5. For summaries, follow this EXACT format structure in any language:
 
    "[Create a short, high-level title summarizing the overall content]"
    Then extract 2–4 major themes from the content. For each:
@@ -296,9 +319,8 @@ INSTRUCTIONS:
    - For articles/blogs: summarize main arguments and conclusions
    - For recipes: key ingredients and steps
    - For product pages: key features and selling points
-6. Format exactly as shown above with headings and bullet points.
 7. Never start responses with phrases like "Here is a summary" or "Here's what the page is about".
-8. NEVER answer a question that is not related to the content of webpage, if asked reply with "Please only ask questions about the Website."
+8. Never answer a question that is unrelated to the theme of webpage, if asked reply with "Please only ask questions about the Website."
 9. Maintain context between messages - if a user asks a follow-up question, understand it in the context of the previous messages and webpage content.
 10. Always answer questions about the content you've analyzed, even if they seem like follow-up questions or references to previous messages.
 11. If you use web search (grounding), always cite your sources. You can use footnote style [1] or inline mentions with URLs.`;
@@ -658,7 +680,7 @@ function sendMessage() {
   
   // Clear input field
   inputField.value = '';
-  inputField.style.height = 'auto';
+  inputField.style.height = '36px'; // Reset to default height that matches button
   
   // Send to Gemini without re-adding the message to chat
   sendToGemini(message, true); // Pass true to indicate message is already added
@@ -1031,76 +1053,185 @@ function addFloatingIcon() {
 
 // Set up resize handler for the chat panel
 function setupResizeHandler() {
-  const resizeHandle = document.querySelector('.msg-resize-handle');
-  if (!resizeHandle) return;
+  // Get the resize handle or create it if it doesn't exist
+  let resizeHandle = document.querySelector('.msg-resize-handle');
+  if (!resizeHandle && chatPanel) {
+    resizeHandle = document.createElement('div');
+    resizeHandle.className = 'msg-resize-handle';
+    chatPanel.appendChild(resizeHandle);
+  }
+  if (!resizeHandle || !chatPanel) return;
+  
+  // Clean up previous event listeners to avoid duplicates
+  if (resizeHandle._cleanupFn) {
+    resizeHandle._cleanupFn();
+  }
   
   let isResizing = false;
-  let initialX, initialWidth;
+  let startX, startWidth;
   
-  // Mouse down on the resize handle
-  resizeHandle.addEventListener('mousedown', function(e) {
-    isResizing = true;
-    initialX = e.clientX;
-    initialWidth = parseInt(document.defaultView.getComputedStyle(chatPanel).width, 10);
+  // Initialize panel width explicitly
+  if (!chatPanel.style.width || chatPanel.style.width === '') {
+    chatPanel.style.width = '380px';
+  }
+  
+  // Force disable transitions on width
+  const originalTransition = chatPanel.style.transition;
+  
+  // Mouse down handler
+  function onMouseDown(e) {
+    // Only handle left mouse button
+    if (e.button !== 0) return;
     
-    // Add active class for visual feedback
+    // Prevent default browser behavior
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // Start resizing
+    isResizing = true;
+    
+    // Record starting position
+    startX = e.clientX;
+    
+    // Explicitly set any inline styles that might be affecting width
+    // First remove any existing width-related inline styles
+    chatPanel.style.removeProperty('max-width');
+    chatPanel.style.removeProperty('min-width');
+    
+    // Force layout calculation to ensure we get accurate width
+    const rect = chatPanel.getBoundingClientRect();
+    startWidth = rect.width;
+    
+    // Ensure the width is explicitly set as an inline style before resizing
+    chatPanel.style.setProperty('width', startWidth + 'px', 'important');
+    
+    // Disable all transitions during resize
+    const originalTransitionProp = chatPanel.style.getPropertyValue('transition');
+    chatPanel.style.setProperty('transition', 'none', 'important');
+    
+    // Visual feedback
     resizeHandle.classList.add('active');
     
-    // Prevent text selection during resize
-    document.body.style.userSelect = 'none';
+    // Create overlay to prevent text selection issues
+    const overlay = document.createElement('div');
+    overlay.className = 'msg-resize-overlay';
+    overlay.style.position = 'fixed';
+    overlay.style.top = '0';
+    overlay.style.left = '0';
+    overlay.style.right = '0';
+    overlay.style.bottom = '0';
+    overlay.style.zIndex = '2147483646';
+    overlay.style.cursor = 'ew-resize';
+    document.body.appendChild(overlay);
     
-    // Store the starting size in localStorage
-    try {
-      localStorage.setItem('msgChatPanelWidth', initialWidth);
-    } catch (e) {
-      // Handle localStorage errors silently
-    }
-  });
+    console.log('MSG: Starting resize at', startX, 'with width', startWidth);
+  }
   
-  // Mouse move - handle the resizing
-  document.addEventListener('mousemove', function(e) {
+  // Mouse move handler
+  function onMouseMove(e) {
     if (!isResizing) return;
     
-    // Calculate new width (note: resizing from right to left)
-    const newWidth = initialWidth + (initialX - e.clientX);
+    // Calculate how far mouse has moved from start position
+    const dx = e.clientX - startX;
     
-    // Apply constraints
-    const minWidth = 300; // Minimum width
-    const maxWidth = window.innerWidth * 0.8; // Maximum width (80% of viewport)
+    // Calculate new width based on mouse movement
+    // Since panel is anchored to right side, moving mouse right (positive dx)
+    // should make panel narrower (startWidth - dx)
+    let newWidth = startWidth - dx;
     
-    if (newWidth >= minWidth && newWidth <= maxWidth) {
-      chatPanel.style.width = newWidth + 'px';
-      
-      // Store the new size in localStorage
-      try {
-        localStorage.setItem('msgChatPanelWidth', newWidth);
-      } catch (e) {
-        // Handle localStorage errors silently
-      }
-    }
-  });
+    // Apply min/max constraints
+    const minWidth = 300;
+    const maxWidth = Math.min(window.innerWidth * 0.8, 800);
+    newWidth = Math.max(minWidth, Math.min(newWidth, maxWidth));
+    
+    // Force panel to be resizable during this operation
+    chatPanel.style.setProperty('width', newWidth + 'px', 'important');
+    chatPanel.style.setProperty('max-width', newWidth + 'px', 'important');
+    chatPanel.style.setProperty('min-width', Math.min(newWidth, 300) + 'px', 'important');
+    
+    // Force a reflow to apply the changes immediately
+    void chatPanel.offsetWidth;
+    
+    console.log('MSG: Resizing to', newWidth, 'px');
+  }
   
-  // Mouse up - stop resizing
-  document.addEventListener('mouseup', function() {
-    if (isResizing) {
-      isResizing = false;
-      resizeHandle.classList.remove('active');
-      document.body.style.userSelect = '';
+  // Mouse up handler
+  function onMouseUp() {
+    if (!isResizing) return;
+    
+    // Stop resizing
+    isResizing = false;
+    
+    // Remove visual feedback
+    resizeHandle.classList.remove('active');
+    
+    // Save the new width
+    try {
+      localStorage.setItem('msgChatPanelWidth', chatPanel.style.width);
+      console.log('MSG: Saved new width:', chatPanel.style.width);
+    } catch (e) {
+      console.error('MSG: Error saving width:', e);
     }
-  });
+    
+    // Restore transition for other properties
+    chatPanel.style.transition = originalTransition;
+    
+    // Remove overlay
+    const overlay = document.querySelector('.msg-resize-overlay');
+    if (overlay) {
+      overlay.remove();
+    }
+  }
+  
+  // Add event listeners
+  resizeHandle.addEventListener('mousedown', onMouseDown);
+  document.addEventListener('mousemove', onMouseMove);
+  document.addEventListener('mouseup', onMouseUp);
+  
+  // Store cleanup function for later
+  resizeHandle._cleanupFn = function() {
+    resizeHandle.removeEventListener('mousedown', onMouseDown);
+    document.removeEventListener('mousemove', onMouseMove);
+    document.removeEventListener('mouseup', onMouseUp);
+  };
 }
 
-// Restore saved panel width if available
+// Always reset panel to default width on page refresh
 function restorePanelSize() {
-  if (chatPanel) {
-    try {
-      const savedWidth = localStorage.getItem('msgChatPanelWidth');
-      if (savedWidth) {
-        chatPanel.style.width = parseInt(savedWidth) + 'px';
-      }
-    } catch (e) {
-      // Handle localStorage errors silently
-    }
+  if (!chatPanel) return;
+  
+  try {
+    // Always use default width (380px) regardless of saved value
+    const defaultWidth = 380;
+    
+    // Apply constraints (for consistency, though we're using default)
+    const minWidth = 300;
+    const maxWidth = window.innerWidth * 0.8;
+    const width = Math.min(Math.max(defaultWidth, minWidth), maxWidth);
+    
+    // Save current transition state
+    const originalTransition = chatPanel.style.getPropertyValue('transition');
+    
+    // Apply width directly with no transition - forced with !important
+    chatPanel.style.setProperty('transition', 'none', 'important');
+    chatPanel.style.setProperty('width', width + 'px', 'important');
+    
+    // For any site that might be applying conflicting styles:
+    chatPanel.style.setProperty('max-width', '80vw', 'important');
+    chatPanel.style.setProperty('min-width', '300px', 'important');
+    
+    // Force a reflow to apply the width immediately
+    void chatPanel.offsetHeight;
+    
+    // Restore the original transition after a small delay
+    setTimeout(() => {
+      // Only restore the transform transition, not width
+      chatPanel.style.setProperty('transition', 'transform 0.3s ease-in-out', 'important');
+    }, 100);
+    
+    console.log("MSG: Reset panel width to default", width + "px");
+  } catch (e) {
+    console.error("MSG: Error resetting panel size:", e);
   }
 }
 

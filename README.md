@@ -6,7 +6,14 @@
 
 MSG is a Chrome extension that helps you chat with any webpage using the power of Gemini AI. Just double press the "/" key to open a chat panel, and start asking questions about the content. No need to copy-paste or share URLs - MSG automatically extracts and processes the content for you.
 
-## ✨ Features
+## 🎯 Key Use Cases
+
+- **📧 Email Assistance**: Read emails and get smart reply suggestions
+- **📚 Academic Research**: Analyze papers, ask questions, and generate proper citations
+- **📰 Article Summaries**: Get concise summaries of news articles and blog posts
+- **🛍️ Product Reviews**: Extract key features and opinions from product pages
+- **🍲 Recipe Analysis**: Break down recipes into ingredients, steps, and cooking tips
+- **🔎 General Web Content**: Ask questions about any webpage content
 
 - **🔄 Instant Access**: Double press `/` to summon the MSG Chat panel
 - **🔘 Floating Icon**: Convenient access via a draggable icon that sticks to the side of your window
@@ -39,7 +46,12 @@ MSG is a Chrome extension that helps you chat with any webpage using the power o
 1. Navigate to any webpage you want to chat about
 2. Double press the `/` key to open the MSG chat panel or click the floating icon
 3. Ask questions about the content, request summaries, or any other queries
-4. Type "summarize" to get a quick overview of the page
+4. Try these powerful commands:
+   - `"Summarize this page"` - Get a quick overview of any content
+   - `"Suggest a reply to this email"` - Get smart reply suggestions for emails
+   - `"Create a citation for this paper"` - Generate academic citations
+   - `"What are the key ingredients in this recipe?"` - Break down recipes
+   - `"Extract the main product features"` - Analyze product details
 5. Double press `/` again, click the close button, or click the floating icon to dismiss the panel
 6. You can reposition the floating icon by holding Shift while dragging it vertically
 
