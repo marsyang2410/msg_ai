@@ -601,9 +601,9 @@
 /* Floating Icon */
 #msg-floating-icon {
   position: fixed !important;
-  right: 20px !important;
-  top: 50% !important;
-  transform: translateY(-50%) !important;
+  right: 10px !important;
+  top: 50%; /* Default vertical position - removed !important to allow JS override */
+  transform: translateY(-50%); /* Default centering - removed !important to allow JS override */
   z-index: 2147483646 !important; /* One less than max to ensure chat panel is above */
   width: 40px !important;
   height: 40px !important;
@@ -614,25 +614,49 @@
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  transition: all 0.3s ease, opacity 0.5s ease !important;
-  opacity: 1 !important; /* Changed from 0 to 1 to make it visible by default */
+  opacity: 0.5 !important; /* Semi-transparent by default */
   pointer-events: auto !important;
+  user-select: none !important; /* Prevent text selection */
+  touch-action: none !important; /* Prevent default touch actions */
+  transition: opacity 0.3s ease, background-color 0.3s ease, box-shadow 0.3s ease, 
+              left 0.3s ease, right 0.3s ease !important; /* Smooth transitions */
 }
 
-/* Removed potentially problematic animation */
+/* Hover state - fully opaque */
 #msg-floating-icon:hover {
   background-color: #B24D3E !important;
-  transform: translateY(-50%) scale(1.1) !important;
+  opacity: 1 !important; /* Fully opaque on hover */
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
 }
 
 #msg-floating-icon img {
   width: 24px !important;
   height: 24px !important;
-  object-fit: contain !important;
+  object-fit: cover !important;
+  border-radius: 50% !important;
+  pointer-events: none !important; /* Ensure icon doesn't interfere with drag */
+  -webkit-user-drag: none !important; /* Prevent image dragging */
+  user-select: none !important;
 }
 
 #msg-floating-icon.dragging {
-  transform: none !important;
+  cursor: grabbing !important;
+  opacity: 0.9 !important; /* Semi-transparent while dragging */
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4) !important; /* Enhanced shadow during drag */
+  transition: none !important; /* Remove transitions during drag for responsiveness */
+}
+
+/* Drag handle styling */
+.msg-drag-handle {
+  cursor: grab !important;
+  -webkit-user-drag: none !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  touch-action: none !important; /* Disable browser touch actions */
+  z-index: 2 !important; /* Above icon content */
+}
+
+.msg-drag-handle:active {
   cursor: grabbing !important;
 }
 

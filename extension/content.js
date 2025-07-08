@@ -170,10 +170,10 @@ function createChatPanel() {
   // Force a redraw/reflow to ensure all styles are applied
   void chatPanel.offsetHeight;
   
-  // Restore saved panel width if available
+  // Restore panel size with saved width from current session
   setTimeout(() => {
     // Small delay to ensure the panel is fully rendered
-    restorePanelSize();
+    restorePanelSize(false); // Pass false to NOT reset to default width
     
     // Force setup of resize handler after sizes are properly initialized
     setupResizeHandler();
@@ -203,8 +203,18 @@ function toggleChatPanel() {
   if (chatPanel.classList.contains('visible')) {
     inputField.focus();
     
-    // Restore saved panel width if available
-    restorePanelSize();
+    // Only use the saved panel width if available from current session
+    // (not triggering restorePanelSize which resets to default)
+    try {
+      const savedWidth = localStorage.getItem('msgChatPanelWidth');
+      if (savedWidth) {
+        // Apply saved width without resetting to default
+        chatPanel.style.setProperty('width', savedWidth, 'important');
+        console.log("MSG: Restored saved panel width:", savedWidth);
+      }
+    } catch (e) {
+      console.error("MSG: Error restoring panel width:", e);
+    }
     
     // Extract page content when panel is opened the first time
     if (!window.msgPageInfo) {
@@ -952,12 +962,20 @@ function addFloatingIcon() {
   const iconContainer = document.createElement('div');
   iconContainer.id = 'msg-floating-icon';
   
+  // Default positioning - right side, centered vertically
+  iconContainer.style.position = 'fixed';
+  iconContainer.style.right = '10px';
+  iconContainer.style.top = '50%';
+  iconContainer.style.transform = 'translateY(-50%)';
+  iconContainer.style.zIndex = '2147483646'; // Very high z-index
+  
   // Add icon image
   try {
     const logoURL = chrome.runtime.getURL('images/msg_logo.png');
     const iconImg = document.createElement('img');
     iconImg.src = logoURL;
     iconImg.alt = 'MSG';
+    iconImg.draggable = false; // Prevent image dragging
     iconImg.onerror = function() {
       console.error("Failed to load floating icon image");
       // Create a fallback colored div with text instead of image
@@ -979,75 +997,181 @@ function addFloatingIcon() {
     container.appendChild(fallbackIcon);
   }
   
-  // Add click handler to toggle chat panel
+  // Add to document body first so we can set up events
+  document.body.appendChild(iconContainer);
+  
+  // Create a separate drag handle overlay to avoid click/drag conflicts
+  const dragHandle = document.createElement('div');
+  dragHandle.className = 'msg-drag-handle';
+  dragHandle.style.position = 'absolute';
+  dragHandle.style.top = '0';
+  dragHandle.style.left = '0';
+  dragHandle.style.right = '0';
+  dragHandle.style.bottom = '0';
+  dragHandle.style.cursor = 'grab';
+  dragHandle.style.zIndex = '2'; // Above the icon but below other elements
+  iconContainer.appendChild(dragHandle);
+  
+  // Variables for drag state
+  let isDragging = false;
+  let startX, startY;
+  let startLeft, startTop;
+  let iconWidth, iconHeight;
+  
+  // Handle click (on the container, not the drag handle)
   iconContainer.addEventListener('click', function(e) {
-    // If shift key is pressed while clicking, don't toggle panel
-    // This allows the user to drag the icon without opening the panel
-    if (!e.shiftKey) {
+    // Only toggle if we're not dragging
+    if (!isDragging && !window.msgDragMoved) {
       toggleChatPanel();
     }
+    window.msgDragMoved = false;
   });
   
-  // Make the icon draggable vertically
-  let isDragging = false;
-  let startY = 0;
-  let startTop = 0;
-  
-  iconContainer.addEventListener('mousedown', function(e) {
-    // Only enable dragging when shift key is pressed
-    if (e.shiftKey) {
-      isDragging = true;
-      startY = e.clientY;
-      const computedStyle = window.getComputedStyle(this);
-      startTop = parseInt(computedStyle.top) || window.innerHeight / 2; // Default to middle if not set
-      this.classList.add('dragging');
-      e.preventDefault(); // Prevent text selection while dragging
-    }
+  // Start drag (on the drag handle)
+  dragHandle.addEventListener('mousedown', function(e) {
+    // Only handle left mouse button
+    if (e.button !== 0) return;
+    
+    // Prevent default to avoid text selection
+    e.preventDefault();
+    
+    // Start dragging
+    isDragging = true;
+    window.msgDragMoved = false; // Reset drag detection
+    
+    // Get current dimensions
+    const rect = iconContainer.getBoundingClientRect();
+    iconWidth = rect.width;
+    iconHeight = rect.height;
+    
+    // Record starting position (relative to viewport)
+    startX = e.clientX;
+    startY = e.clientY;
+    startLeft = rect.left;
+    startTop = rect.top;
+    
+    // Visual feedback
+    dragHandle.style.cursor = 'grabbing';
+    iconContainer.classList.add('dragging');
+    
+    // Remove any transition during dragging
+    iconContainer.style.transition = 'none';
+    
+    // Add document-level event listeners for tracking the drag
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
   });
   
-  // Add the icon container to the document body
-  document.body.appendChild(iconContainer);
-  
-  document.addEventListener('mousemove', function(e) {
-    if (isDragging) {
-      const newTop = startTop + (e.clientY - startY);
-      // Constrain to window boundaries
-      const maxTop = window.innerHeight - 40; // Icon height
-      const constrainedTop = Math.max(20, Math.min(newTop, maxTop));
-      iconContainer.style.top = constrainedTop + 'px';
-      
-      // Store position in localStorage
-      try {
-        localStorage.setItem('msgIconPosition', constrainedTop);
-      } catch (e) {
-        // Handle localStorage errors silently
-      }
+  // Handle drag movement
+  function onMouseMove(e) {
+    if (!isDragging) return;
+    
+    // Calculate how far the mouse has moved
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+    
+    // If moved more than 5px, consider it a drag not a click
+    if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+      window.msgDragMoved = true;
     }
-  });
-  
-  document.addEventListener('mouseup', function() {
-    if (isDragging) {
-      isDragging = false;
-      iconContainer.classList.remove('dragging');
-    }
-  });
-  
-  // Restore saved position if available
-  try {
-    const savedPosition = localStorage.getItem('msgIconPosition');
-    if (savedPosition) {
-      iconContainer.style.top = parseInt(savedPosition) + 'px';
-      // When using a specific top position, remove the default transform
-      iconContainer.style.transform = 'none';
-    }
-  } catch (e) {
-    // Handle localStorage errors silently
+    
+    // Calculate new position
+    const newLeft = startLeft + dx;
+    const newTop = startTop + dy;
+    
+    // Constrain to window boundaries
+    const maxLeft = window.innerWidth - iconWidth;
+    const maxTop = window.innerHeight - iconHeight;
+    
+    const constrainedLeft = Math.max(0, Math.min(newLeft, maxLeft));
+    const constrainedTop = Math.max(0, Math.min(newTop, maxTop));
+    
+    // Update position with absolute values
+    iconContainer.style.position = 'fixed';
+    iconContainer.style.setProperty('top', constrainedTop + 'px', 'important');
+    iconContainer.style.setProperty('left', constrainedLeft + 'px', 'important');
+    iconContainer.style.right = 'auto'; // Clear right positioning during drag
+    iconContainer.style.setProperty('transform', 'none', 'important'); // Remove centering transform with !important
   }
   
-  // Append to document body only once
-  document.body.appendChild(iconContainer);
+  // End drag
+  function onMouseUp(e) {
+    if (!isDragging) return;
+    
+    // Stop dragging
+    isDragging = false;
+    dragHandle.style.cursor = 'grab';
+    iconContainer.classList.remove('dragging');
+    
+    // Get current position
+    const rect = iconContainer.getBoundingClientRect();
+    const currentLeft = rect.left;
+    const currentTop = rect.top;
+    
+    // Add animation for snapping to sides (horizontal) while preserving vertical position
+    iconContainer.style.transition = 'left 0.3s ease, right 0.3s ease';
+    
+    // Determine which side is closer (left or right)
+    const distanceToLeft = currentLeft;
+    const distanceToRight = window.innerWidth - (currentLeft + rect.width);
+    
+    // Snap to the closest edge horizontally but KEEP the vertical position
+    if (distanceToLeft < distanceToRight) {
+      // Stick to left
+      iconContainer.style.left = '10px';
+      iconContainer.style.right = 'auto';
+      localStorage.setItem('msgIconSide', 'left');
+    } else {
+      // Stick to right
+      iconContainer.style.left = 'auto';
+      iconContainer.style.right = '10px';
+      localStorage.setItem('msgIconSide', 'right');
+    }
+    
+    // Important: Keep vertical position as is and ensure transform is removed
+    iconContainer.style.setProperty('top', currentTop + 'px', 'important');
+    iconContainer.style.setProperty('transform', 'none', 'important'); // Remove translateY(-50%) with !important
+    
+    // Save vertical position
+    localStorage.setItem('msgIconPosition', currentTop.toString());
+    
+    // Clear transition after animation completes
+    setTimeout(() => {
+      iconContainer.style.transition = '';
+    }, 300);
+    
+    // Remove document-level event listeners
+    document.removeEventListener('mousemove', onMouseMove);
+    document.removeEventListener('mouseup', onMouseUp);
+  }
   
-  // Mark icon as added
+  // Restore saved position
+  try {
+    const savedPosition = localStorage.getItem('msgIconPosition');
+    const savedSide = localStorage.getItem('msgIconSide');
+    
+    if (savedPosition) {
+      // Apply the saved vertical position
+      iconContainer.style.setProperty('top', savedPosition + 'px', 'important');
+      
+      // Remove centering transform to ensure position is respected
+      iconContainer.style.setProperty('transform', 'none', 'important');
+      
+      // Restore side preference
+      if (savedSide === 'left') {
+        iconContainer.style.left = '10px';
+        iconContainer.style.right = 'auto';
+      } else {
+        // Default to right
+        iconContainer.style.right = '10px';
+        iconContainer.style.left = 'auto';
+      }
+    }
+  } catch (e) {
+    console.error('Error restoring icon position:', e);
+  }
+  
+  // Mark as added to prevent duplicates
   window.msgIconAdded = true;
 }
 
@@ -1197,41 +1321,54 @@ function setupResizeHandler() {
 }
 
 // Always reset panel to default width on page refresh
-function restorePanelSize() {
+function restorePanelSize(usePageRefresh = true) {
   if (!chatPanel) return;
   
   try {
-    // Always use default width (380px) regardless of saved value
+    // Default width is always 380px
     const defaultWidth = 380;
     
-    // Apply constraints (for consistency, though we're using default)
-    const minWidth = 300;
-    const maxWidth = window.innerWidth * 0.8;
-    const width = Math.min(Math.max(defaultWidth, minWidth), maxWidth);
-    
-    // Save current transition state
-    const originalTransition = chatPanel.style.getPropertyValue('transition');
-    
-    // Apply width directly with no transition - forced with !important
-    chatPanel.style.setProperty('transition', 'none', 'important');
-    chatPanel.style.setProperty('width', width + 'px', 'important');
-    
-    // For any site that might be applying conflicting styles:
-    chatPanel.style.setProperty('max-width', '80vw', 'important');
-    chatPanel.style.setProperty('min-width', '300px', 'important');
-    
-    // Force a reflow to apply the width immediately
-    void chatPanel.offsetHeight;
-    
-    // Restore the original transition after a small delay
-    setTimeout(() => {
-      // Only restore the transform transition, not width
-      chatPanel.style.setProperty('transition', 'transform 0.3s ease-in-out', 'important');
-    }, 100);
-    
-    console.log("MSG: Reset panel width to default", width + "px");
+    if (usePageRefresh) {
+      // This is called on page refresh/load - reset to default and clear saved width
+      try {
+        localStorage.removeItem('msgChatPanelWidth');
+      } catch (e) {
+        // Handle localStorage errors silently
+      }
+      
+      // Apply constraints (for consistency, though we're using default)
+      const minWidth = 300;
+      const maxWidth = window.innerWidth * 0.8;
+      const width = Math.min(Math.max(defaultWidth, minWidth), maxWidth);
+      
+      // Save current transition state
+      const originalTransition = chatPanel.style.getPropertyValue('transition');
+      
+      // Apply width directly with no transition - forced with !important
+      chatPanel.style.setProperty('transition', 'none', 'important');
+      chatPanel.style.setProperty('width', width + 'px', 'important');
+      
+      // For any site that might be applying conflicting styles:
+      chatPanel.style.setProperty('max-width', '80vw', 'important');
+      chatPanel.style.setProperty('min-width', '300px', 'important');
+      
+      // Force a reflow to apply the width immediately
+      void chatPanel.offsetHeight;
+      
+      // Restore the original transition after a small delay
+      setTimeout(() => {
+        // Only restore the transform transition, not width
+        chatPanel.style.setProperty('transition', 'transform 0.3s ease-in-out', 'important');
+      }, 100);
+      
+      console.log("MSG: Reset panel width to default", width + "px");
+    } else {
+      // This is called when restoring from close/reopen - DON'T reset to default
+      // The toggleChatPanel function will handle restoring the saved width if available
+      console.log("MSG: Not resetting panel width - will use saved width if available");
+    }
   } catch (e) {
-    console.error("MSG: Error resetting panel size:", e);
+    console.error("MSG: Error in restorePanelSize:", e);
   }
 }
 
@@ -1242,6 +1379,11 @@ function initialize() {
   // Create chat panel if it doesn't exist
   if (!document.getElementById('msg-chat-panel')) {
     createChatPanel();
+    
+    // On initial page load, make sure we reset to default width
+    setTimeout(() => {
+      restorePanelSize(true); // Pass true to reset to default width on page load
+    }, 200);
   }
   
   // Add floating icon if it doesn't exist and not already added
@@ -1282,4 +1424,11 @@ window.addEventListener('beforeunload', function() {
   window.msgContextPrepared = false;
   window.msgAutoSummarized = false;
   window.msgPageInfo = null;
+  
+  // Clear any saved panel width to ensure it resets on refresh
+  try {
+    localStorage.removeItem('msgChatPanelWidth');
+  } catch (e) {
+    // Handle localStorage errors silently
+  }
 });
