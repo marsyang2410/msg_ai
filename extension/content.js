@@ -417,6 +417,99 @@ function addVisualMessage(role, content) {
   chatContainer.scrollTop = chatContainer.scrollHeight;
 }
 
+// Helper function to format tables from markdown-like syntax
+function formatTables(content) {
+  const lines = content.split('\n');
+  let result = [];
+  let inTable = false;
+  let tableRows = [];
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    
+    // Check if this line looks like a table row (contains |)
+    if (line.includes('|') && line.split('|').length >= 3) {
+      if (!inTable) {
+        inTable = true;
+        tableRows = [];
+      }
+      tableRows.push(line);
+    } else {
+      // If we were in a table and this line doesn't look like a table row
+      if (inTable) {
+        // Process the collected table rows
+        const tableHTML = processTableRows(tableRows);
+        result.push(tableHTML);
+        inTable = false;
+        tableRows = [];
+      }
+      
+      // Add the non-table line
+      if (line.length > 0) {
+        result.push(line);
+      }
+    }
+  }
+  
+  // Handle any remaining table at the end
+  if (inTable && tableRows.length > 0) {
+    const tableHTML = processTableRows(tableRows);
+    result.push(tableHTML);
+  }
+  
+  return result.join('\n');
+}
+
+// Helper function to process table rows into HTML
+function processTableRows(rows) {
+  if (rows.length === 0) return '';
+  
+  let html = '<div class="msg-table-wrapper"><table class="msg-table">';
+  let isFirstRow = true;
+  
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i].trim();
+    
+    // Skip separator rows (like |---|---|)
+    if (row.match(/^\|[\s\-\|:]+\|$/)) {
+      continue;
+    }
+    
+    // Split the row by | and clean up
+    const cells = row.split('|')
+      .map(cell => cell.trim())
+      .filter((cell, index, array) => {
+        // Remove empty cells at start and end (from leading/trailing |)
+        return !(cell === '' && (index === 0 || index === array.length - 1));
+      });
+    
+    if (cells.length === 0) continue;
+    
+    // Determine if this is a header row (first non-separator row)
+    const isHeader = isFirstRow;
+    const cellTag = isHeader ? 'th' : 'td';
+    
+    html += '<tr>';
+    for (const cell of cells) {
+      // Process any markdown formatting within the cell
+      let processedCell = cell
+        .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+        .replace(/`([^`]+)`/g, '<code>$1</code>');
+      
+      html += `<${cellTag}>${processedCell}</${cellTag}>`;
+    }
+    html += '</tr>';
+    
+    if (isFirstRow) {
+      isFirstRow = false;
+    }
+  }
+  
+  html += '</table></div>';
+  return html;
+}
+
   // Format message content with basic Markdown-like syntax
 function formatMessageContent(content) {
   if (!content) return '';
@@ -438,10 +531,53 @@ function formatMessageContent(content) {
     '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
   );
   
-  // Format source citations - [1] or [2], etc.
+  // Format source citations - [1] or [2], etc. (enhanced for grounding)
   safeContent = safeContent.replace(
-    /\[(\d+)\]/g, 
-    '<sup class="msg-citation">[$1]</sup>'
+    /\[(\d+(?:,\d+)*)\]/g, 
+    '<sup class="msg-citation" data-citation="$1">[$1]</sup>'
+  );
+  
+  // Format **Sources:** section specially
+  safeContent = safeContent.replace(
+    /\*\*Sources:\*\*([\s\S]*?)(?=\n\n|\n*$)/g,
+    '<div class="msg-sources"><strong>Sources:</strong>$1</div>'
+  );
+  
+  // Within Sources section, format as a clean inline list
+  safeContent = safeContent.replace(
+    /<div class="msg-sources">([\s\S]*?)<\/div>/g,
+    function(match, content) {
+      // Extract all source entries and format them as a clean inline list
+      const sourceMatches = content.match(/\[(\d+)\]\s*([^:]+):\s*(https?:\/\/[^\s\n]+)/g);
+      const fallbackMatches = content.match(/\[(\d+)\]\s*(https?:\/\/[^\s\n]+)/g);
+      
+      let formattedSources = '';
+      
+      if (sourceMatches) {
+        formattedSources = sourceMatches.map(match => {
+          const parts = match.match(/\[(\d+)\]\s*([^:]+):\s*(https?:\/\/[^\s\n]+)/);
+          if (parts) {
+            const [, num, title, url] = parts;
+            return `<a href="${url.trim()}" target="_blank" rel="noopener noreferrer">[${num}] ${title.trim()}</a>`;
+          }
+          return '';
+        }).filter(Boolean).join('  ');
+      }
+      
+      if (fallbackMatches && !formattedSources) {
+        formattedSources = fallbackMatches.map(match => {
+          const parts = match.match(/\[(\d+)\]\s*(https?:\/\/[^\s\n]+)/);
+          if (parts) {
+            const [, num, url] = parts;
+            const domain = url.replace(/https?:\/\//, '').replace(/\/.*/, '');
+            return `<a href="${url.trim()}" target="_blank" rel="noopener noreferrer">[${num}] ${domain}</a>`;
+          }
+          return '';
+        }).filter(Boolean).join('  ');
+      }
+      
+      return `<div class="msg-sources"><strong>Sources:</strong> ${formattedSources}</div>`;
+    }
   );
   
   // Format source URLs at the end of response
@@ -479,6 +615,9 @@ function formatMessageContent(content) {
     /`([^`]+)`/g,
     '<code>$1</code>'
   );
+  
+  // Format tables - Markdown table syntax
+  safeContent = formatTables(safeContent);
   
   // Additional formatting for blockquotes
   safeContent = safeContent.replace(
@@ -827,13 +966,13 @@ function extractPageContent() {
   
   // Add the raw HTML (with scripts/styles removed) for structure analysis
   // This ensures the model has access to the full HTML structure if needed
-  enhancedContent += `PAGE HTML STRUCTURE (for reference):\n${rawHtml.substring(0, 10000)}`;
+  enhancedContent += `PAGE HTML STRUCTURE (for reference):\n${rawHtml.substring(0, 15000)}`;
   
   // Set final content to enhanced version
   content = enhancedContent;
   
   // Limit the content length (optimized for token efficiency)
-  const maxContentLength = 10000; // Reduced for better token efficiency
+  const maxContentLength = 15000; // Reduced for better token efficiency
   if (content.length > maxContentLength) {
     content = content.substring(0, maxContentLength) + '... (truncated)';
   }
@@ -870,47 +1009,8 @@ function sendToGemini(userMessage, messageAlreadyAdded = false) {
     const pageInfo = extractPageContent();
     window.msgPageInfo = pageInfo;
     
-    // Prepare system message with page context if needed
-    const contextMessage = `You are MSG, a helpful AI assistant for webpage content.
-
-PAGE INFO:
-Title: "${pageInfo.title}"
-URL: ${pageInfo.url}
-
-CONTENT:
-${pageInfo.content}
-
-INSTRUCTIONS:
-1. You have ALL the page content above - never ask for more.
-2. Never ask for URLs or text - you already have everything.
-3. You may have access to web search (grounding) capabilities to answer questions that go beyond the content on the page. If you use this, cite your sources.
-4. For summarize requests, follow this EXACT format structure:
-
-   "[Create a short, high-level title summarizing the overall content]"
-   
-   Then extract major themes from the content. For each:
-   
-   **[Descriptive heading for this key theme or section]**
-   - [One sentence summary for this key point] add more if necessary
-
-
-   Note: Format exactly as shown with quotes around the title, bold headers (using ** on both sides), and bullet points (-) for summaries.
-   
-   - Avoid repeating the original article title in Heading1. Rephrase it to reflect the purpose, theme, or angle of the content.
-   - Focus on core points, not side notes or navigation elements
-   - Avoid table of contents, ads, or unrelated page elements
-   - Use plain and helpful language for quick scanning
-5. Format your responses in this EXACT format:
-   - Start with a quoted title: "Summarized Title"
-   - Use bold section headers: **Sub Topic**
-   - Include bullet points with one-sentence summaries under each section
-   - Keep the format compact with no unnecessary empty lines between sections
-   - Adapt the number of topics and bullet points based on the content's complexity
-6. Never start responses with phrases like "Here is a summary" or "Here's what the page is about".
-7. Format with markdown: **bold**, *italic*, \`code\`, bullet lists (•), numbered lists, #headings.
-8. Maintain context between messages - if a user asks a follow-up question, understand it in the context of the previous messages and webpage content.
-9. Always answer questions about the content you've analyzed, even if they seem like follow-up questions or references to previous messages.
-10. If you use web search (grounding), always cite your sources. You can use footnote style [1] or inline mentions with URLs.`;
+    // Prepare system message with page context using the existing function
+    const contextMessage = createSystemMessage(pageInfo);
 
     // Add this context to chat messages if not already there
     if (!chatMessages.some(msg => msg.role === 'system')) {

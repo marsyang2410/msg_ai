@@ -39,7 +39,11 @@
 #msg-chat-panel a,
 #msg-chat-panel code,
 #msg-chat-panel pre,
-#msg-chat-panel blockquote {
+#msg-chat-panel blockquote,
+#msg-chat-panel table,
+#msg-chat-panel th,
+#msg-chat-panel td,
+#msg-chat-panel tr {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif !important;
   color: inherit !important;
 }
@@ -188,7 +192,7 @@
 #msg-chat-panel .msg-chat-container {
   flex: 1 !important;
   overflow-y: auto !important;
-  overflow-x: hidden !important; /* Prevent horizontal overflow */
+  overflow-x: visible !important; /* Allow horizontal scrolling for tables */
   padding: 16px !important;
   background-color: rgba(246, 231, 215, 0.95) !important;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif !important;
@@ -368,6 +372,66 @@
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif !important;
 }
 
+/* Citation styles for grounding sources */
+#msg-chat-panel .msg-assistant-message [data-citation],
+#msg-chat-panel .msg-assistant-message sup {
+  color: #D4A373 !important;
+  font-size: 0.85em !important;
+  font-weight: 600 !important;
+  text-decoration: none !important;
+  background: rgba(212, 163, 115, 0.1) !important;
+  padding: 1px 3px !important;
+  border-radius: 2px !important;
+  margin: 0 1px !important;
+  vertical-align: super !important;
+  line-height: 1 !important;
+  cursor: pointer !important;
+}
+
+#msg-chat-panel .msg-assistant-message [data-citation]:hover,
+#msg-chat-panel .msg-assistant-message sup:hover {
+  background: rgba(212, 163, 115, 0.2) !important;
+  color: #B8956A !important;
+}
+
+/* Sources section styling - clean inline format */
+#msg-chat-panel .msg-assistant-message .msg-sources {
+  margin-top: 16px !important;
+  padding: 8px 0 !important;
+  border-top: 1px solid rgba(212, 163, 115, 0.3) !important;
+  font-size: 12px !important;
+  line-height: 1.6 !important;
+}
+
+#msg-chat-panel .msg-assistant-message .msg-sources strong {
+  color: #D4A373 !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  margin-right: 8px !important;
+}
+
+#msg-chat-panel .msg-assistant-message .msg-sources a {
+  color: #666 !important;
+  text-decoration: none !important;
+  font-size: 12px !important;
+  margin-right: 16px !important;
+  white-space: nowrap !important;
+}
+
+#msg-chat-panel .msg-assistant-message .msg-sources a:hover {
+  color: #D4A373 !important;
+  text-decoration: underline !important;
+}
+
+/* Remove all the complex styling */
+#msg-chat-panel .msg-assistant-message .msg-sources .citation-number,
+#msg-chat-panel .msg-assistant-message .msg-sources .citation-title,
+#msg-chat-panel .msg-assistant-message .msg-sources .citation-domain {
+  display: inline !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
 #msg-chat-panel .msg-input-container {
   display: flex !important;
   padding: 12px 16px !important;
@@ -496,7 +560,21 @@
   
   #msg-chat-panel .msg-assistant-message {
     background-color: #555 !important;
-    color: #f0f0f0 !important;
+    color: #ffffff !important; /* Make text white */
+  }
+  
+  /* Ensure all text elements in assistant messages are white */
+  #msg-chat-panel .msg-assistant-message * {
+    color: #ffffff !important;
+  }
+  
+  /* Ensure paragraphs and regular text are white */
+  #msg-chat-panel .msg-assistant-message p {
+    color: #ffffff !important;
+  }
+  
+  #msg-chat-panel .msg-assistant-message li {
+    color: #ffffff !important;
   }
   
   #msg-chat-panel .msg-input-container {
@@ -518,13 +596,13 @@
   
   /* Dark mode for formatted content */
   #msg-chat-panel .msg-assistant-message a {
-    color: #F6E7D7 !important;
-    border-bottom-color: #F6E7D7 !important;
+    color: #ffffff !important; /* Make links white too */
+    border-bottom-color: #ffffff !important;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif !important;
   }
   
   #msg-chat-panel .msg-assistant-message strong {
-    color: #F6E7D7 !important;
+    color: #ffffff !important; /* Make bold text white */
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif !important;
     font-weight: bold !important;
   }
@@ -542,7 +620,7 @@
   #msg-chat-panel .msg-assistant-message h1, 
   #msg-chat-panel .msg-assistant-message h2, 
   #msg-chat-panel .msg-assistant-message h3 {
-    color: #F6E7D7 !important;
+    color: #ffffff !important; /* Make headings white too */
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif !important;
     font-weight: bold !important;
   }
@@ -566,6 +644,65 @@
     color: #aaa !important;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif !important;
     font-style: italic !important;
+  }
+  
+  /* Dark mode table styles */
+  #msg-chat-panel .msg-message .msg-table-wrapper {
+    border-color: #555 !important;
+    background-color: #2a2a2a !important;
+  }
+  
+  #msg-chat-panel .msg-message .msg-table {
+    background-color: #2a2a2a !important;
+  }
+  
+  #msg-chat-panel .msg-message .msg-table th {
+    background-color: #404040 !important;
+    color: #f0f0f0 !important;
+    border-bottom-color: #555 !important;
+  }
+  
+  #msg-chat-panel .msg-message .msg-table td {
+    color: #e0e0e0 !important;
+    border-bottom-color: #444 !important;
+  }
+  
+  #msg-chat-panel .msg-message .msg-table tr:nth-child(even) {
+    background-color: #333 !important;
+  }
+  
+  #msg-chat-panel .msg-message .msg-table tr:hover {
+    background-color: #3a3a3a !important;
+  }
+  
+  /* Dark mode citation styles */
+  #msg-chat-panel .msg-assistant-message [data-citation],
+  #msg-chat-panel .msg-assistant-message sup {
+    color: #D4A373 !important;
+    background: rgba(212, 163, 115, 0.15) !important;
+  }
+  
+  #msg-chat-panel .msg-assistant-message [data-citation]:hover,
+  #msg-chat-panel .msg-assistant-message sup:hover {
+    background: rgba(212, 163, 115, 0.25) !important;
+    color: #E6C79C !important;
+  }
+  
+  /* Dark mode sources styling - clean inline */
+  #msg-chat-panel .msg-assistant-message .msg-sources {
+    border-color: rgba(212, 163, 115, 0.4) !important;
+  }
+  
+  #msg-chat-panel .msg-assistant-message .msg-sources strong {
+    color: #E6C79C !important;
+  }
+  
+  #msg-chat-panel .msg-assistant-message .msg-sources a {
+    color: #ccc !important;
+  }
+  
+  #msg-chat-panel .msg-assistant-message .msg-sources a:hover {
+    color: #E6C79C !important;
   }
 }
 
@@ -596,6 +733,107 @@
 
 #msg-chat-panel .msg-message .msg-source-link:hover {
   color: #3367D6 !important;
+}
+
+/* Table styling for MSG messages */
+/* Table wrapper for horizontal scrolling */
+#msg-chat-panel .msg-message .msg-table-wrapper {
+  width: 100% !important;
+  overflow-x: auto !important;
+  overflow-y: visible !important;
+  margin: 12px 0 !important;
+  border: 1px solid #E1E5E9 !important;
+  border-radius: 6px !important;
+  background-color: #fff !important;
+  /* Isolate the scrolling context */
+  contain: layout style !important;
+  /* Custom scrollbar styling */
+  scrollbar-width: thin !important;
+  scrollbar-color: #C1C1C1 #F1F1F1 !important;
+}
+
+/* Webkit scrollbar styling for table wrapper */
+#msg-chat-panel .msg-message .msg-table-wrapper::-webkit-scrollbar {
+  height: 8px !important;
+}
+
+#msg-chat-panel .msg-message .msg-table-wrapper::-webkit-scrollbar-track {
+  background: #F1F1F1 !important;
+  border-radius: 4px !important;
+}
+
+#msg-chat-panel .msg-message .msg-table-wrapper::-webkit-scrollbar-thumb {
+  background: #C1C1C1 !important;
+  border-radius: 4px !important;
+}
+
+#msg-chat-panel .msg-message .msg-table-wrapper::-webkit-scrollbar-thumb:hover {
+  background: #A1A1A1 !important;
+}
+
+#msg-chat-panel .msg-message .msg-table {
+  width: 100% !important;
+  min-width: auto !important; /* Remove forced min-width */
+  max-width: 100% !important; /* Ensure table fits within container */
+  border-collapse: collapse !important;
+  margin: 0 !important; /* Remove margin since wrapper handles it */
+  font-size: 14px !important;
+  background-color: #fff !important;
+  border: none !important; /* Remove border since wrapper handles it */
+  border-radius: 0 !important; /* Remove border radius since wrapper handles it */
+  table-layout: auto !important; /* Let table adjust column widths automatically */
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif !important;
+}
+
+#msg-chat-panel .msg-message .msg-table th {
+  background-color: #F8F9FA !important;
+  color: #202124 !important;
+  font-weight: 600 !important;
+  text-align: left !important;
+  padding: 12px 16px !important;
+  border-bottom: 2px solid #E1E5E9 !important;
+  white-space: normal !important; /* Allow text wrapping in headers */
+  word-wrap: break-word !important;
+  overflow-wrap: break-word !important;
+  max-width: 200px !important; /* Set reasonable max width for headers */
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif !important;
+}
+
+#msg-chat-panel .msg-message .msg-table td {
+  padding: 10px 16px !important;
+  border-bottom: 1px solid #F1F3F4 !important;
+  color: #3C4043 !important;
+  vertical-align: top !important;
+  white-space: normal !important; /* Allow text wrapping in cells */
+  word-wrap: break-word !important;
+  overflow-wrap: break-word !important;
+  max-width: 250px !important; /* Set reasonable max width for cells */
+  line-height: 1.5 !important; /* Better line spacing for wrapped text */
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif !important;
+}
+
+#msg-chat-panel .msg-message .msg-table tr:last-child td {
+  border-bottom: none !important;
+}
+
+#msg-chat-panel .msg-message .msg-table tr:nth-child(even) {
+  background-color: #FAFBFC !important;
+}
+
+#msg-chat-panel .msg-message .msg-table tr:hover {
+  background-color: #F8F9FA !important;
+}
+
+/* Responsive table on smaller screens */
+@media (max-width: 600px) {
+  #msg-chat-panel .msg-message .msg-table {
+    font-size: 12px !important;
+  }
+  
+  #msg-chat-panel .msg-message .msg-table th,
+  #msg-chat-panel .msg-message .msg-table td {
+    padding: 8px 12px !important;
+  }
 }
 
 /* Floating Icon */
