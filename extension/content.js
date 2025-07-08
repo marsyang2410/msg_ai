@@ -1120,20 +1120,40 @@ function addFloatingIcon() {
       // Stick to left
       iconContainer.style.left = '10px';
       iconContainer.style.right = 'auto';
-      localStorage.setItem('msgIconSide', 'left');
+      // Save to Chrome storage for global persistence across all websites
+      chrome.storage.sync.set({ 'msgIconSide': 'left' }, function() {
+        if (chrome.runtime.lastError) {
+          console.error('MSG: Error saving icon side:', chrome.runtime.lastError);
+        } else {
+          console.log('MSG: Saved global icon side: left');
+        }
+      });
     } else {
       // Stick to right
       iconContainer.style.left = 'auto';
       iconContainer.style.right = '10px';
-      localStorage.setItem('msgIconSide', 'right');
+      // Save to Chrome storage for global persistence across all websites
+      chrome.storage.sync.set({ 'msgIconSide': 'right' }, function() {
+        if (chrome.runtime.lastError) {
+          console.error('MSG: Error saving icon side:', chrome.runtime.lastError);
+        } else {
+          console.log('MSG: Saved global icon side: right');
+        }
+      });
     }
     
     // Important: Keep vertical position as is and ensure transform is removed
     iconContainer.style.setProperty('top', currentTop + 'px', 'important');
     iconContainer.style.setProperty('transform', 'none', 'important'); // Remove translateY(-50%) with !important
     
-    // Save vertical position
-    localStorage.setItem('msgIconPosition', currentTop.toString());
+    // Save vertical position to Chrome storage for global persistence across all websites
+    chrome.storage.sync.set({ 'msgIconPosition': currentTop.toString() }, function() {
+      if (chrome.runtime.lastError) {
+        console.error('MSG: Error saving icon position:', chrome.runtime.lastError);
+      } else {
+        console.log('MSG: Saved global icon position:', currentTop);
+      }
+    });
     
     // Clear transition after animation completes
     setTimeout(() => {
@@ -1145,31 +1165,42 @@ function addFloatingIcon() {
     document.removeEventListener('mouseup', onMouseUp);
   }
   
-  // Restore saved position
-  try {
-    const savedPosition = localStorage.getItem('msgIconPosition');
-    const savedSide = localStorage.getItem('msgIconSide');
-    
-    if (savedPosition) {
-      // Apply the saved vertical position
-      iconContainer.style.setProperty('top', savedPosition + 'px', 'important');
-      
-      // Remove centering transform to ensure position is respected
-      iconContainer.style.setProperty('transform', 'none', 'important');
-      
-      // Restore side preference
-      if (savedSide === 'left') {
-        iconContainer.style.left = '10px';
-        iconContainer.style.right = 'auto';
-      } else {
-        // Default to right
-        iconContainer.style.right = '10px';
-        iconContainer.style.left = 'auto';
-      }
+  // Restore saved position from Chrome storage (global across all websites)
+  chrome.storage.sync.get(['msgIconPosition', 'msgIconSide'], function(result) {
+    if (chrome.runtime.lastError) {
+      console.error('MSG: Error retrieving icon position:', chrome.runtime.lastError);
+      return;
     }
-  } catch (e) {
-    console.error('Error restoring icon position:', e);
-  }
+    
+    try {
+      const savedPosition = result.msgIconPosition;
+      const savedSide = result.msgIconSide;
+      
+      if (savedPosition) {
+        // Apply the saved vertical position
+        iconContainer.style.setProperty('top', savedPosition + 'px', 'important');
+        
+        // Remove centering transform to ensure position is respected
+        iconContainer.style.setProperty('transform', 'none', 'important');
+        
+        // Restore side preference
+        if (savedSide === 'left') {
+          iconContainer.style.left = '10px';
+          iconContainer.style.right = 'auto';
+        } else {
+          // Default to right
+          iconContainer.style.right = '10px';
+          iconContainer.style.left = 'auto';
+        }
+        
+        console.log('MSG: Restored global icon position:', savedPosition, 'side:', savedSide);
+      } else {
+        console.log('MSG: No saved icon position found, using default');
+      }
+    } catch (e) {
+      console.error('MSG: Error restoring icon position:', e);
+    }
+  });
   
   // Mark as added to prevent duplicates
   window.msgIconAdded = true;
