@@ -184,4 +184,260 @@ async function fetchGeminiResponse(messages, apiKey, enableGrounding, groundingM
   };
   
   // Add grounding configuration if enabled
-  if (enableGrounding)
+  if (enableGrounding) {
+    // Determine if grounding should be used based on mode
+    const shouldGround = 
+      groundingMode === 'always' || 
+      (groundingMode === 'auto' && shouldUseGroundingForQuery(filteredMessages[filteredMessages.length - 1].content)) ||
+      (groundingMode === 'explicit' && explicitlyRequestedGrounding(filteredMessages[filteredMessages.length - 1].content));
+    
+    if (shouldGround) {
+      requestData.systemInstruction = {
+        parts: [{
+          text: "You are an AI assistant with web grounding capabilities. Use web searches to provide accurate, up-to-date information when answering questions. Cite your sources inline. For webpage content analysis, focus on the content provided by the user and only use grounding when questions extend beyond the provided content."
+        }]
+      };
+      
+      // Add the modern grounding config
+      requestData.tools = [{
+        googleSearch: {}
+      }];
+    }
+  }
+  
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-goog-api-key': apiKey
+      },
+      body: JSON.stringify(requestData)
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error?.message || 'API request failed');
+    }
+    
+    const data = await response.json();
+    
+    // Extract the response text and grounding metadata
+    if (data.candidates && data.candidates.length > 0 && 
+        data.candidates[0].content && data.candidates[0].content.parts && 
+        data.candidates[0].content.parts.length > 0) {
+      
+      let responseText = data.candidates[0].content.parts[0].text;
+      const groundingMetadata = data.candidates[0].groundingMetadata;
+      
+      // Process grounding metadata and add inline citations
+      if (groundingMetadata && groundingMetadata.groundingChunks) {
+        const { citedText, citations } = processGroundingMetadata(responseText, groundingMetadata);
+        responseText = citedText;
+        
+        // If we have citations, append them at the end
+        if (citations.length > 0) {
+          responseText += '\n\n**Sources:**\n' + citations.map((citation, index) => 
+            `[${index + 1}] ${citation.title}: ${citation.uri}`
+          ).join('\n');
+        }
+      }
+      
+      return responseText;
+    } else {
+      throw new Error('Invalid response format from Gemini API');
+    }
+  } catch (error) {
+    console.error('Gemini API error:', error);
+    throw error;
+  }
+}
+
+// Helper function to process grounding metadata and add inline citations
+function processGroundingMetadata(text, groundingMetadata) {
+  if (!groundingMetadata || !groundingMetadata.groundingChunks) {
+    return { citedText: text, citations: [] };
+  }
+  
+  // Extract unique web sources from grounding chunks
+  const webSources = new Map();
+  const groundingSupports = groundingMetadata.groundingSupports || [];
+  
+  // Build a map of web sources
+  groundingMetadata.groundingChunks.forEach((chunk, index) => {
+    if (chunk.web && chunk.web.uri && chunk.web.title) {
+      const sourceKey = chunk.web.uri;
+      if (!webSources.has(sourceKey)) {
+        webSources.set(sourceKey, {
+          title: chunk.web.title,
+          uri: chunk.web.uri,
+          citationIndex: webSources.size + 1
+        });
+      }
+    }
+  });
+  
+  let citedText = text;
+  const citations = Array.from(webSources.values());
+  
+  // Process grounding supports to add inline citations
+  if (groundingSupports.length > 0 && citations.length > 0) {
+    // Sort grounding supports by start index in descending order
+    // This prevents index shifting when inserting citations
+    const sortedSupports = groundingSupports
+      .filter(support => support.segment && support.groundingChunkIndices)
+      .sort((a, b) => (b.segment.startIndex || 0) - (a.segment.startIndex || 0));
+    
+    for (const support of sortedSupports) {
+      const startIndex = support.segment.startIndex || 0;
+      const endIndex = support.segment.endIndex || startIndex;
+      
+      // Get the chunk indices for this support
+      const chunkIndices = support.groundingChunkIndices || [];
+      
+      // Map chunk indices to citation numbers
+      const citationNumbers = chunkIndices
+        .map(chunkIndex => {
+          const chunk = groundingMetadata.groundingChunks[chunkIndex];
+          if (chunk && chunk.web && chunk.web.uri) {
+            const source = webSources.get(chunk.web.uri);
+            return source ? source.citationIndex : null;
+          }
+          return null;
+        })
+        .filter(num => num !== null)
+        .filter((num, index, arr) => arr.indexOf(num) === index) // Remove duplicates
+        .sort((a, b) => a - b);
+      
+      // Insert citation markers
+      if (citationNumbers.length > 0) {
+        const citationMarker = `[${citationNumbers.join(',')}]`;
+        citedText = citedText.slice(0, endIndex) + citationMarker + citedText.slice(endIndex);
+      }
+    }
+  }
+  
+  return { citedText, citations };
+}
+
+// NEW: Function to get text embeddings using Gemini
+async function getTextEmbedding(text, apiKey) {
+  const url = 'https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent';
+  
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-goog-api-key': apiKey
+      },
+      body: JSON.stringify({
+        model: 'models/text-embedding-004',
+        content: {
+          parts: [{ text: text.substring(0, 2048) }] // Limit text length for embedding
+        }
+      })
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error?.message || 'Embedding API request failed');
+    }
+    
+    const data = await response.json();
+    return data.embedding.values; // Returns array of 768 numbers
+  } catch (error) {
+    console.error('Gemini Embedding API error:', error);
+    throw error;
+  }
+}
+
+// NEW: Batch embedding function for better efficiency
+async function getBatchEmbeddings(texts, apiKey) {
+  const embeddings = [];
+  
+  // Process in batches to avoid rate limits
+  const batchSize = 3; // Conservative batch size for free tier
+  for (let i = 0; i < texts.length; i += batchSize) {
+    const batch = texts.slice(i, i + batchSize);
+    
+    const batchPromises = batch.map(text => 
+      getTextEmbedding(text, apiKey).catch(error => {
+        console.warn('Failed to embed text:', error);
+        return new Array(768).fill(0); // Return zero vector as fallback
+      })
+    );
+    
+    const batchResults = await Promise.all(batchPromises);
+    embeddings.push(...batchResults);
+    
+    // Small delay to respect rate limits
+    if (i + batchSize < texts.length) {
+      await new Promise(resolve => setTimeout(resolve, 200));
+    }
+  }
+  
+  return embeddings;
+}
+
+// Helper function to determine if a query requires complex reasoning
+function isComplexReasoningQuery(query) {
+  // Keywords that suggest complex reasoning tasks
+  const complexReasoningKeywords = [
+    'analyze', 'comparison', 'compare', 'evaluate', 'assess', 'critique',
+    'explain how', 'explain why', 'reasoning', 'logic', 'argument',
+    'pros and cons', 'advantages', 'disadvantages', 'trade-offs',
+    'strategy', 'plan', 'approach', 'methodology', 'framework',
+    'complex', 'detailed analysis', 'in-depth', 'comprehensive',
+    'multi-step', 'step by step', 'breakdown', 'systematically',
+    'implications', 'consequences', 'impact', 'effects',
+    'solve', 'problem', 'solution', 'troubleshoot', 'debug',
+    'code review', 'architecture', 'design pattern', 'algorithm',
+    'mathematical', 'calculation', 'formula', 'equation'
+  ];
+  
+  // Check query length (longer queries often require more reasoning)
+  const isLongQuery = query.length > 200;
+  
+  // Check for complex reasoning keywords
+  const hasComplexKeywords = complexReasoningKeywords.some(keyword => 
+    query.toLowerCase().includes(keyword.toLowerCase())
+  );
+  
+  // Check for multiple questions or complex sentence structure
+  const hasMultipleQuestions = (query.match(/\?/g) || []).length > 1;
+  const hasComplexStructure = query.includes(';') || query.includes('however') || 
+                             query.includes('furthermore') || query.includes('moreover');
+  
+  return isLongQuery || hasComplexKeywords || hasMultipleQuestions || hasComplexStructure;
+}
+
+// Helper function to determine if a query would benefit from grounding
+function shouldUseGroundingForQuery(query) {
+  // List of keywords that suggest the query would benefit from current information
+  const groundingKeywords = [
+    'current', 'latest', 'recent', 'today', 'news', 'update', 
+    'what is happening', 'this year', 'this month', 'this week',
+    'tell me about', 'who is', 'where is', 'when did', 'how many',
+    'search for', 'look up', 'find information', 'research',
+    'stock price', 'weather', 'event', 'fact check', 'verify'
+  ];
+  
+  // Check if any of the keywords are in the query
+  return groundingKeywords.some(keyword => 
+    query.toLowerCase().includes(keyword.toLowerCase())
+  );
+}
+
+// Helper function to check if the user explicitly requested grounding
+function explicitlyRequestedGrounding(query) {
+  const explicitGroundingPhrases = [
+    'search', 'look up', 'find online', 'google', 'web search',
+    'search the web', 'find information about', 'use grounding',
+    'check online', 'search for', 'use web search', 'search the internet'
+  ];
+  
+  return explicitGroundingPhrases.some(phrase => 
+    query.toLowerCase().includes(phrase.toLowerCase())
+  );
+}
