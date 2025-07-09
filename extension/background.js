@@ -47,24 +47,96 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
     // Return true to indicate that the response will be sent asynchronously
     return true;
   }
+  
+  // NEW: Handle embedding requests for RAG
+  if (request.action === 'getEmbedding') {
+    chrome.storage.sync.get(['geminiApiKey'], function(result) {
+      if (!result.geminiApiKey) {
+        sendResponse({
+          success: false,
+          error: 'API key not found. Please set your Gemini API key in the extension options.'
+        });
+        return;
+      }
+      
+      getTextEmbedding(request.text, result.geminiApiKey)
+        .then(embedding => {
+          sendResponse({
+            success: true,
+            embedding: embedding
+          });
+        })
+        .catch(error => {
+          sendResponse({
+            success: false,
+            error: error.message
+          });
+        });
+    });
+    
+    return true;
+  }
+  
+  // NEW: Handle batch embedding requests for efficiency
+  if (request.action === 'getBatchEmbeddings') {
+    chrome.storage.sync.get(['geminiApiKey'], function(result) {
+      if (!result.geminiApiKey) {
+        sendResponse({
+          success: false,
+          error: 'API key not found'
+        });
+        return;
+      }
+      
+      getBatchEmbeddings(request.texts, result.geminiApiKey)
+        .then(embeddings => {
+          sendResponse({
+            success: true,
+            embeddings: embeddings
+          });
+        })
+        .catch(error => {
+          sendResponse({
+            success: false,
+            error: error.message
+          });
+        });
+    });
+    
+    return true;
+  }
 });
 
 // Function to call Gemini API
 async function fetchGeminiResponse(messages, apiKey, enableGrounding, groundingMode, pageUrl) {
-  // Determine which Gemini 2.0 model to use based on complexity and grounding needs
-  // gemini-2.0-flash-exp: Fast, cost-effective for most tasks
-  // gemini-exp-1206: More capable for complex reasoning tasks
+  // Determine which Gemini model to use based on complexity and RAG context
+  // gemini-2.0-flash-lite: Ultra-fast, most cost-effective for RAG queries and simple tasks
+  // gemini-2.5-flash: Enhanced capabilities for complex reasoning and summaries
   const lastMessage = messages[messages.length - 1]?.content || '';
-  const isComplexQuery = isComplexReasoningQuery(lastMessage);
+  
+  // Check if this is a RAG-enhanced query (contains relevant context)
+  const hasRAGContext = lastMessage.includes('RELEVANT CONTEXT:') || lastMessage.includes('[RAG]');
+  
+  // Check if this is a summary query that needs more tokens
+  const isSummaryQuery = lastMessage.toLowerCase().includes('summarize') ||
+                        lastMessage.toLowerCase().includes('summary') ||
+                        lastMessage.toLowerCase().includes('overview') ||
+                        lastMessage.toLowerCase().includes('what is this about') ||
+                        lastMessage.toLowerCase().includes('main points');
+  
+  const isComplexQuery = !hasRAGContext && isComplexReasoningQuery(lastMessage);
   
   let modelName;
-  if (isComplexQuery) {
-    modelName = 'gemini-exp-1206'; // Gemini 2.0 Pro experimental for complex tasks
+  if (hasRAGContext) {
+    // Use ultra-fast lite model for RAG queries since context is pre-filtered
+    modelName = 'gemini-2.0-flash-lite';
+  } else if (isComplexQuery || isSummaryQuery) {
+    modelName = 'gemini-2.5-flash'; // Use 2.5 Flash for complex queries and summaries
   } else {
-    modelName = 'gemini-2.0-flash-exp'; // Gemini 2.0 Flash experimental for standard tasks
+    modelName = 'gemini-2.0-flash-lite'; // Use lite model for standard queries
   }
   
-  console.log(`MSG: Using ${modelName} for query (complex: ${isComplexQuery})`);
+  console.log(`MSG: Using ${modelName} (RAG: ${hasRAGContext}, Complex: ${isComplexQuery}, Summary: ${isSummaryQuery})`);
   
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`;
   
@@ -99,14 +171,15 @@ async function fetchGeminiResponse(messages, apiKey, enableGrounding, groundingM
     parts: [{ text: msg.content }]
   }));
   
-  // Build the request data with optimized settings for Gemini 2.0
+  // Build the request data with optimized settings for Gemini 2.0/2.5 Flash models
   const requestData = {
     contents: formattedMessages.length > 0 ? formattedMessages : [{ role: 'user', parts: [{ text: systemPrompt || 'Hello' }] }],
     generationConfig: {
       temperature: 0.7,
-      topK: 64, // Increased for Gemini 2.0's improved token selection
+      topK: modelName === 'gemini-2.5-flash' ? 64 : 40, // Higher for 2.5 Flash
       topP: 0.95,
-      maxOutputTokens: 8192 // Increased token limit for Gemini 2.0's capabilities
+      // Optimize output tokens based on query type and model capabilities
+      maxOutputTokens: hasRAGContext ? 4096 : (isSummaryQuery ? 8192 : 6144)
     }
   };
   
@@ -245,6 +318,66 @@ function processGroundingMetadata(text, groundingMetadata) {
   }
   
   return { citedText, citations };
+}
+
+// NEW: Function to get text embeddings using Gemini
+async function getTextEmbedding(text, apiKey) {
+  const url = 'https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent';
+  
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-goog-api-key': apiKey
+      },
+      body: JSON.stringify({
+        model: 'models/text-embedding-004',
+        content: {
+          parts: [{ text: text.substring(0, 2048) }] // Limit text length for embedding
+        }
+      })
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error?.message || 'Embedding API request failed');
+    }
+    
+    const data = await response.json();
+    return data.embedding.values; // Returns array of 768 numbers
+  } catch (error) {
+    console.error('Gemini Embedding API error:', error);
+    throw error;
+  }
+}
+
+// NEW: Batch embedding function for better efficiency
+async function getBatchEmbeddings(texts, apiKey) {
+  const embeddings = [];
+  
+  // Process in batches to avoid rate limits
+  const batchSize = 3; // Conservative batch size for free tier
+  for (let i = 0; i < texts.length; i += batchSize) {
+    const batch = texts.slice(i, i + batchSize);
+    
+    const batchPromises = batch.map(text => 
+      getTextEmbedding(text, apiKey).catch(error => {
+        console.warn('Failed to embed text:', error);
+        return new Array(768).fill(0); // Return zero vector as fallback
+      })
+    );
+    
+    const batchResults = await Promise.all(batchPromises);
+    embeddings.push(...batchResults);
+    
+    // Small delay to respect rate limits
+    if (i + batchSize < texts.length) {
+      await new Promise(resolve => setTimeout(resolve, 200));
+    }
+  }
+  
+  return embeddings;
 }
 
 // Helper function to determine if a query requires complex reasoning

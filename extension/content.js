@@ -19,6 +19,176 @@ window.msgAutoSummarized = false;    // Has auto-summary been performed?
 window.msgPageInfo = null;           // Extracted page content
 window.msgIconAdded = false;         // Tracks if the floating icon has been added
 
+// NEW: RAG System for temporary webpage database
+class WebpageRAG {
+  constructor() {
+    this.chunks = [];
+    this.embeddings = [];
+    this.isInitialized = false;
+    this.isInitializing = false;
+  }
+
+  async initializeRAG(pageContent) {
+    if (this.isInitializing) return;
+    this.isInitializing = true;
+    
+    console.log("MSG RAG: Starting initialization...");
+    
+    try {
+      // Split content into semantic chunks
+      this.chunks = this.createSemanticChunks(pageContent);
+      console.log(`MSG RAG: Created ${this.chunks.length} content chunks`);
+      
+      // Create embeddings for each chunk
+      const chunkTexts = this.chunks.map(chunk => chunk.text);
+      const embeddings = await this.getBatchEmbeddings(chunkTexts);
+      this.embeddings = embeddings;
+      
+      this.isInitialized = true;
+      console.log(`MSG RAG: Initialization complete with ${this.chunks.length} chunks`);
+    } catch (error) {
+      console.error('MSG RAG: Initialization failed:', error);
+      this.isInitialized = false;
+    } finally {
+      this.isInitializing = false;
+    }
+  }
+
+  createSemanticChunks(content) {
+    const chunks = [];
+    
+    // Strategy 1: Split by headings and sections
+    const sections = content.split(/\n(?=(?:TITLE:|META:|HEADINGS:|PAGE CONTENT:|H[1-6]:))/);
+    
+    sections.forEach(section => {
+      if (section.trim().length < 100) return;
+      
+      // If section is very long, split by paragraphs
+      if (section.length > 1500) {
+        const paragraphs = section.split(/\n\s*\n/);
+        let currentChunk = '';
+        
+        paragraphs.forEach(para => {
+          if (para.trim().length < 50) return;
+          
+          if (currentChunk.length + para.length > 1200) {
+            if (currentChunk.trim()) {
+              chunks.push({
+                text: currentChunk.trim(),
+                type: 'paragraph_group',
+                length: currentChunk.length
+              });
+            }
+            currentChunk = para;
+          } else {
+            currentChunk += (currentChunk ? '\n\n' : '') + para;
+          }
+        });
+        
+        if (currentChunk.trim()) {
+          chunks.push({
+            text: currentChunk.trim(),
+            type: 'paragraph_group',
+            length: currentChunk.length
+          });
+        }
+      } else {
+        chunks.push({
+          text: section.trim(),
+          type: 'section',
+          length: section.length
+        });
+      }
+    });
+    
+    // Ensure we don't have too many chunks (limit for free tier)
+    return chunks.slice(0, 15); // Limit to 15 chunks for efficiency
+  }
+
+  async getBatchEmbeddings(texts) {
+    return new Promise((resolve) => {
+      chrome.runtime.sendMessage({
+        action: 'getBatchEmbeddings',
+        texts: texts
+      }, (response) => {
+        if (response && response.success) {
+          resolve(response.embeddings);
+        } else {
+          console.warn('Failed to get batch embeddings:', response?.error);
+          resolve(texts.map(() => new Array(768).fill(0))); // Fallback
+        }
+      });
+    });
+  }
+
+  async getTextEmbedding(text) {
+    return new Promise((resolve) => {
+      chrome.runtime.sendMessage({
+        action: 'getEmbedding',
+        text: text.substring(0, 500) // Limit for embedding
+      }, (response) => {
+        if (response && response.success) {
+          resolve(response.embedding);
+        } else {
+          resolve(new Array(768).fill(0)); // Fallback
+        }
+      });
+    });
+  }
+
+  async searchRelevantChunks(query, topK = 3) {
+    if (!this.isInitialized) {
+      console.log('MSG RAG: Not initialized, returning empty results');
+      return [];
+    }
+    
+    try {
+      // Get query embedding
+      const queryEmbedding = await this.getTextEmbedding(query);
+      
+      // Calculate cosine similarity with all chunks
+      const similarities = this.embeddings.map((embedding, index) => ({
+        index,
+        similarity: this.cosineSimilarity(queryEmbedding, embedding),
+        chunk: this.chunks[index]
+      }));
+      
+      // Return top K most similar chunks
+      const results = similarities
+        .sort((a, b) => b.similarity - a.similarity)
+        .slice(0, topK)
+        .filter(item => item.similarity > 0.1) // Minimum similarity threshold
+        .map(item => item.chunk);
+      
+      console.log(`MSG RAG: Found ${results.length} relevant chunks for query`);
+      return results;
+    } catch (error) {
+      console.error('MSG RAG: Search failed:', error);
+      return [];
+    }
+  }
+
+  cosineSimilarity(a, b) {
+    if (a.length !== b.length) return 0;
+    
+    let dotProduct = 0;
+    let normA = 0;
+    let normB = 0;
+    
+    for (let i = 0; i < a.length; i++) {
+      dotProduct += a[i] * b[i];
+      normA += a[i] * a[i];
+      normB += b[i] * b[i];
+    }
+    
+    const norm = Math.sqrt(normA) * Math.sqrt(normB);
+    return norm > 0 ? dotProduct / norm : 0;
+  }
+}
+
+// Global RAG instance
+window.msgRAG = new WebpageRAG();
+
 // Initialize everything
 function initialize() {
   // Create chat panel if it doesn't exist
@@ -218,21 +388,30 @@ function toggleChatPanel() {
     
     // Extract page content when panel is opened the first time
     if (!window.msgPageInfo) {
-      console.log("Extracting page content...");
+      console.log("MSG: Extracting page content...");
       const pageInfo = extractPageContent();
-      console.log("Content extraction complete. Length:", pageInfo.content.length);
+      console.log("MSG: Content extraction complete. Length:", pageInfo.content.length);
       
       // Store page content in a global variable for easy access
       window.msgPageInfo = pageInfo;
       
+      // Initialize RAG database with the page content
+      console.log("MSG: Initializing RAG database...");
+      window.msgRAG.initializeRAG(pageInfo.content).then(() => {
+        console.log("MSG: RAG database initialization complete");
+      }).catch(error => {
+        console.error("MSG: RAG initialization failed:", error);
+      });
+      
       // Log content length for debugging
-      console.log("Extracted content length:", pageInfo.content.length);
-      console.log("Content sample:", pageInfo.content.substring(0, 200) + "...");
+      console.log("MSG: Extracted content length:", pageInfo.content.length);
+      console.log("MSG: Content sample:", pageInfo.content.substring(0, 200) + "...");
     }
     
     // Add a hidden system message to prepare the context (only first time)
     if (!window.msgContextPrepared) {
-      // Prepare system message with page context
+      // For initial context, use full system message to ensure good summaries
+      // RAG will optimize follow-up queries
       const contextMessage = createSystemMessage(window.msgPageInfo);
       
       // Reset chat history and add the context
@@ -241,7 +420,7 @@ function toggleChatPanel() {
       window.msgContextPrepared = true;
       
       // Add welcome message (visual only, not sent to API)
-      addVisualMessage('assistant', 'Hi there! I\'m MSG, your website assistant. I\'ve fully analyzed this page and can help you understand its content.');
+      addVisualMessage('assistant', 'Hi there! I\'m MSG, your website assistant. I\'ve analyzed this page and can help you understand its content with intelligent search.');
       
       // Check if grounding is enabled and add a status message
       chrome.storage.sync.get(['msgSettings'], function(result) {
@@ -334,6 +513,23 @@ INSTRUCTIONS:
 9. Maintain context between messages - if a user asks a follow-up question, understand it in the context of the previous messages and webpage content.
 10. Always answer questions about the content you've analyzed, even if they seem like follow-up questions or references to previous messages.
 11. If you use web search (grounding), always cite your sources. You can use footnote style [1] or inline mentions with URLs.`;
+}
+
+// NEW: Create minimal system message for RAG-enhanced queries
+function createMinimalSystemMessage(pageInfo) {
+  return `You are MSG, a helpful AI assistant for analyzing webpage content.
+
+PAGE INFO:
+Title: "${pageInfo.title}"
+URL: ${pageInfo.url}
+
+INSTRUCTIONS:
+1. You will receive relevant content chunks based on user queries via RAG search.
+2. Use the provided RELEVANT CONTEXT to answer questions accurately.
+3. If you use web search (grounding), cite your sources with [1], [2] format.
+4. For summaries, use this format: "[Title]" then **Section Headers** with bullet points.
+5. Stay focused on the webpage content and provided context.
+6. Never ask for additional information - work with what's provided.`;
 }
 
 // Add a message to the chat
@@ -971,10 +1167,35 @@ function extractPageContent() {
   // Set final content to enhanced version
   content = enhancedContent;
   
-  // Limit the content length (optimized for token efficiency)
-  const maxContentLength = 15000; // Reduced for better token efficiency
+  // Smart content length optimization based on query type and RAG availability
+  let maxContentLength;
+  
+  // Check if this is for initial context preparation or a specific query
+  const isInitialContext = !window.msgRAG || !window.msgRAG.isInitialized;
+  
+  if (isInitialContext) {
+    // For initial context and summaries, use more content
+    maxContentLength = 12000; // Reduced from 15000 but still comprehensive
+  } else {
+    // For RAG-enhanced queries, we can use less since RAG provides targeted chunks
+    maxContentLength = 6000; // Moderate reduction for follow-up queries
+  }
+  
   if (content.length > maxContentLength) {
-    content = content.substring(0, maxContentLength) + '... (truncated)';
+    // Smart truncation: try to end at a sentence or paragraph boundary
+    let truncatedContent = content.substring(0, maxContentLength);
+    
+    // Find the last sentence boundary within the limit
+    const lastSentence = truncatedContent.lastIndexOf('. ');
+    const lastParagraph = truncatedContent.lastIndexOf('\n\n');
+    
+    // Use the boundary that's closer to the end but still reasonable
+    const cutoff = Math.max(lastSentence, lastParagraph);
+    if (cutoff > maxContentLength * 0.8) {
+      truncatedContent = content.substring(0, cutoff + (lastSentence > lastParagraph ? 2 : 2));
+    }
+    
+    content = truncatedContent + '... (content continues - RAG system will provide relevant chunks for specific queries)';
   }
   
   // Log extraction information for debugging
@@ -998,7 +1219,7 @@ function extractPageContent() {
 }
 
 // Send message to Gemini API via background script
-function sendToGemini(userMessage, messageAlreadyAdded = false) {
+async function sendToGemini(userMessage, messageAlreadyAdded = false) {
   // Show loading indicator
   showLoading();
   
@@ -1009,8 +1230,8 @@ function sendToGemini(userMessage, messageAlreadyAdded = false) {
     const pageInfo = extractPageContent();
     window.msgPageInfo = pageInfo;
     
-    // Prepare system message with page context using the existing function
-    const contextMessage = createSystemMessage(pageInfo);
+    // For fallback when RAG isn't ready, use minimal system message
+    const contextMessage = createMinimalSystemMessage(pageInfo);
 
     // Add this context to chat messages if not already there
     if (!chatMessages.some(msg => msg.role === 'system')) {
@@ -1032,534 +1253,44 @@ function sendToGemini(userMessage, messageAlreadyAdded = false) {
     }
   }
   
-  // Prepare messages for API - always include all messages
-  const messages = [...chatMessages];
+  // NEW: Use RAG for follow-up queries, but preserve full context for summaries
+  let enhancedMessage = userMessage;
+  let useRAG = false;
   
-  // Send to background script
-  chrome.runtime.sendMessage({
-    action: 'fetchGeminiResponse',
-    messages: messages,
-    url: window.location.href
-  }, function(response) {
-    // Hide loading indicator
-    hideLoading();
-    
-    if (response && response.success) {
-      // Add assistant response to chat
-      addMessage('assistant', response.response);
-    } else {
-      // Add error message
-      const errorMsg = response?.error || 'Error: Please check your API key in settings.';
-      addMessage('assistant', errorMsg);
-    }
-  });
-}
-
-// Create and add floating icon
-function addFloatingIcon() {
-  if (window.msgIconAdded) return; // Prevent adding multiple icons
+  // Determine if this query would benefit from RAG vs full context
+  const isSummaryQuery = userMessage && (
+    userMessage.toLowerCase().includes('summarize') ||
+    userMessage.toLowerCase().includes('summary') ||
+    userMessage.toLowerCase().includes('overview') ||
+    userMessage.toLowerCase().includes('what is this about') ||
+    userMessage.toLowerCase().includes('main points')
+  );
   
-  const iconContainer = document.createElement('div');
-  iconContainer.id = 'msg-floating-icon';
-  
-  // Default positioning - right side, centered vertically
-  iconContainer.style.position = 'fixed';
-  iconContainer.style.right = '10px';
-  iconContainer.style.top = '50%';
-  iconContainer.style.transform = 'translateY(-50%)';
-  iconContainer.style.zIndex = '2147483646'; // Very high z-index
-  
-  // Add icon image
-  try {
-    const logoURL = chrome.runtime.getURL('images/msg_logo.png');
-    const iconImg = document.createElement('img');
-    iconImg.src = logoURL;
-    iconImg.alt = 'MSG';
-    iconImg.draggable = false; // Prevent image dragging
-    iconImg.onerror = function() {
-      console.error("Failed to load floating icon image");
-      // Create a fallback colored div with text instead of image
-      this.remove(); // Remove the broken image
-      createFallbackIcon(iconContainer);
-    };
-    iconContainer.appendChild(iconImg);
-    console.log("Using floating icon URL:", logoURL);
-  } catch (e) {
-    console.error("Error setting floating icon:", e);
-    createFallbackIcon(iconContainer);
-  }
-  
-  // Helper function to create a fallback icon
-  function createFallbackIcon(container) {
-    const fallbackIcon = document.createElement('div');
-    fallbackIcon.className = 'msg-icon-fallback';
-    fallbackIcon.textContent = 'M';
-    container.appendChild(fallbackIcon);
-  }
-  
-  // Add to document body first so we can set up events
-  document.body.appendChild(iconContainer);
-  
-  // Create a separate drag handle overlay to avoid click/drag conflicts
-  const dragHandle = document.createElement('div');
-  dragHandle.className = 'msg-drag-handle';
-  dragHandle.style.position = 'absolute';
-  dragHandle.style.top = '0';
-  dragHandle.style.left = '0';
-  dragHandle.style.right = '0';
-  dragHandle.style.bottom = '0';
-  dragHandle.style.cursor = 'grab';
-  dragHandle.style.zIndex = '2'; // Above the icon but below other elements
-  iconContainer.appendChild(dragHandle);
-  
-  // Variables for drag state
-  let isDragging = false;
-  let startX, startY;
-  let startLeft, startTop;
-  let iconWidth, iconHeight;
-  
-  // Handle click (on the container, not the drag handle)
-  iconContainer.addEventListener('click', function(e) {
-    // Only toggle if we're not dragging
-    if (!isDragging && !window.msgDragMoved) {
-      toggleChatPanel();
-    }
-    window.msgDragMoved = false;
-  });
-  
-  // Start drag (on the drag handle)
-  dragHandle.addEventListener('mousedown', function(e) {
-    // Only handle left mouse button
-    if (e.button !== 0) return;
-    
-    // Prevent default to avoid text selection
-    e.preventDefault();
-    
-    // Start dragging
-    isDragging = true;
-    window.msgDragMoved = false; // Reset drag detection
-    
-    // Get current dimensions
-    const rect = iconContainer.getBoundingClientRect();
-    iconWidth = rect.width;
-    iconHeight = rect.height;
-    
-    // Record starting position (relative to viewport)
-    startX = e.clientX;
-    startY = e.clientY;
-    startLeft = rect.left;
-    startTop = rect.top;
-    
-    // Visual feedback
-    dragHandle.style.cursor = 'grabbing';
-    iconContainer.classList.add('dragging');
-    
-    // Remove any transition during dragging
-    iconContainer.style.transition = 'none';
-    
-    // Add document-level event listeners for tracking the drag
-    document.addEventListener('mousemove', onMouseMove);
-    document.addEventListener('mouseup', onMouseUp);
-  });
-  
-  // Handle drag movement
-  function onMouseMove(e) {
-    if (!isDragging) return;
-    
-    // Calculate how far the mouse has moved
-    const dx = e.clientX - startX;
-    const dy = e.clientY - startY;
-    
-    // If moved more than 5px, consider it a drag not a click
-    if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
-      window.msgDragMoved = true;
-    }
-    
-    // Calculate new position
-    const newLeft = startLeft + dx;
-    const newTop = startTop + dy;
-    
-    // Constrain to window boundaries
-    const maxLeft = window.innerWidth - iconWidth;
-    const maxTop = window.innerHeight - iconHeight;
-    
-    const constrainedLeft = Math.max(0, Math.min(newLeft, maxLeft));
-    const constrainedTop = Math.max(0, Math.min(newTop, maxTop));
-    
-    // Update position with absolute values
-    iconContainer.style.position = 'fixed';
-    iconContainer.style.setProperty('top', constrainedTop + 'px', 'important');
-    iconContainer.style.setProperty('left', constrainedLeft + 'px', 'important');
-    iconContainer.style.right = 'auto'; // Clear right positioning during drag
-    iconContainer.style.setProperty('transform', 'none', 'important'); // Remove centering transform with !important
-  }
-  
-  // End drag
-  function onMouseUp(e) {
-    if (!isDragging) return;
-    
-    // Stop dragging
-    isDragging = false;
-    dragHandle.style.cursor = 'grab';
-    iconContainer.classList.remove('dragging');
-    
-    // Get current position
-    const rect = iconContainer.getBoundingClientRect();
-    const currentLeft = rect.left;
-    const currentTop = rect.top;
-    
-    // Add animation for snapping to sides (horizontal) while preserving vertical position
-    iconContainer.style.transition = 'left 0.3s ease, right 0.3s ease';
-    
-    // Determine which side is closer (left or right)
-    const distanceToLeft = currentLeft;
-    const distanceToRight = window.innerWidth - (currentLeft + rect.width);
-    
-    // Snap to the closest edge horizontally but KEEP the vertical position
-    if (distanceToLeft < distanceToRight) {
-      // Stick to left
-      iconContainer.style.left = '10px';
-      iconContainer.style.right = 'auto';
-      // Save to Chrome storage for global persistence across all websites
-      chrome.storage.sync.set({ 'msgIconSide': 'left' }, function() {
-        if (chrome.runtime.lastError) {
-          console.error('MSG: Error saving icon side:', chrome.runtime.lastError);
-        } else {
-          console.log('MSG: Saved global icon side: left');
-        }
-      });
-    } else {
-      // Stick to right
-      iconContainer.style.left = 'auto';
-      iconContainer.style.right = '10px';
-      // Save to Chrome storage for global persistence across all websites
-      chrome.storage.sync.set({ 'msgIconSide': 'right' }, function() {
-        if (chrome.runtime.lastError) {
-          console.error('MSG: Error saving icon side:', chrome.runtime.lastError);
-        } else {
-          console.log('MSG: Saved global icon side: right');
-        }
-      });
-    }
-    
-    // Important: Keep vertical position as is and ensure transform is removed
-    iconContainer.style.setProperty('top', currentTop + 'px', 'important');
-    iconContainer.style.setProperty('transform', 'none', 'important'); // Remove translateY(-50%) with !important
-    
-    // Save vertical position to Chrome storage for global persistence across all websites
-    chrome.storage.sync.set({ 'msgIconPosition': currentTop.toString() }, function() {
-      if (chrome.runtime.lastError) {
-        console.error('MSG: Error saving icon position:', chrome.runtime.lastError);
-      } else {
-        console.log('MSG: Saved global icon position:', currentTop);
-      }
-    });
-    
-    // Clear transition after animation completes
-    setTimeout(() => {
-      iconContainer.style.transition = '';
-    }, 300);
-    
-    // Remove document-level event listeners
-    document.removeEventListener('mousemove', onMouseMove);
-    document.removeEventListener('mouseup', onMouseUp);
-  }
-  
-  // Restore saved position from Chrome storage (global across all websites)
-  chrome.storage.sync.get(['msgIconPosition', 'msgIconSide'], function(result) {
-    if (chrome.runtime.lastError) {
-      console.error('MSG: Error retrieving icon position:', chrome.runtime.lastError);
-      return;
-    }
-    
+  // Use RAG for specific questions, but not for summaries or when RAG isn't ready
+  if (window.msgRAG && window.msgRAG.isInitialized && userMessage && !isSummaryQuery) {
     try {
-      const savedPosition = result.msgIconPosition;
-      const savedSide = result.msgIconSide;
+      const relevantChunks = await window.msgRAG.searchRelevantChunks(userMessage, 3);
       
-      if (savedPosition) {
-        // Apply the saved vertical position
-        iconContainer.style.setProperty('top', savedPosition + 'px', 'important');
+      if (relevantChunks.length > 0) {
+        const contextText = relevantChunks
+          .map((chunk, index) => `[${index + 1}] ${chunk.text}`)
+          .join('\n\n');
         
-        // Remove centering transform to ensure position is respected
-        iconContainer.style.setProperty('transform', 'none', 'important');
-        
-        // Restore side preference
-        if (savedSide === 'left') {
-          iconContainer.style.left = '10px';
-          iconContainer.style.right = 'auto';
-        } else {
-          // Default to right
-          iconContainer.style.right = '10px';
-          iconContainer.style.left = 'auto';
-        }
-        
-        console.log('MSG: Restored global icon position:', savedPosition, 'side:', savedSide);
+        enhancedMessage = `[RAG] ${userMessage}\n\nRELEVANT CONTEXT:\n${contextText}`;
+        useRAG = true;
+        console.log(`MSG RAG: Enhanced query with ${relevantChunks.length} relevant chunks`);
       } else {
-        console.log('MSG: No saved icon position found, using default');
+        console.log('MSG RAG: No relevant chunks found, using full context');
       }
-    } catch (e) {
-      console.error('MSG: Error restoring icon position:', e);
+    } catch (error) {
+      console.error('MSG RAG: Search failed, falling back to full context:', error);
     }
-  });
-  
-  // Mark as added to prevent duplicates
-  window.msgIconAdded = true;
-}
-
-// Set up resize handler for the chat panel
-function setupResizeHandler() {
-  // Get the resize handle or create it if it doesn't exist
-  let resizeHandle = document.querySelector('.msg-resize-handle');
-  if (!resizeHandle && chatPanel) {
-    resizeHandle = document.createElement('div');
-    resizeHandle.className = 'msg-resize-handle';
-    chatPanel.appendChild(resizeHandle);
-  }
-  if (!resizeHandle || !chatPanel) return;
-  
-  // Clean up previous event listeners to avoid duplicates
-  if (resizeHandle._cleanupFn) {
-    resizeHandle._cleanupFn();
-  }
-  
-  let isResizing = false;
-  let startX, startWidth;
-  
-  // Initialize panel width explicitly
-  if (!chatPanel.style.width || chatPanel.style.width === '') {
-    chatPanel.style.width = '380px';
-  }
-  
-  // Force disable transitions on width
-  const originalTransition = chatPanel.style.transition;
-  
-  // Mouse down handler
-  function onMouseDown(e) {
-    // Only handle left mouse button
-    if (e.button !== 0) return;
-    
-    // Prevent default browser behavior
-    e.preventDefault();
-    e.stopPropagation();
-    
-    // Start resizing
-    isResizing = true;
-    
-    // Record starting position
-    startX = e.clientX;
-    
-    // Explicitly set any inline styles that might be affecting width
-    // First remove any existing width-related inline styles
-    chatPanel.style.removeProperty('max-width');
-    chatPanel.style.removeProperty('min-width');
-    
-    // Force layout calculation to ensure we get accurate width
-    const rect = chatPanel.getBoundingClientRect();
-    startWidth = rect.width;
-    
-    // Ensure the width is explicitly set as an inline style before resizing
-    chatPanel.style.setProperty('width', startWidth + 'px', 'important');
-    
-    // Disable all transitions during resize
-    const originalTransitionProp = chatPanel.style.getPropertyValue('transition');
-    chatPanel.style.setProperty('transition', 'none', 'important');
-    
-    // Visual feedback
-    resizeHandle.classList.add('active');
-    
-    // Create overlay to prevent text selection issues
-    const overlay = document.createElement('div');
-    overlay.className = 'msg-resize-overlay';
-    overlay.style.position = 'fixed';
-    overlay.style.top = '0';
-    overlay.style.left = '0';
-    overlay.style.right = '0';
-    overlay.style.bottom = '0';
-    overlay.style.zIndex = '2147483646';
-    overlay.style.cursor = 'ew-resize';
-    document.body.appendChild(overlay);
-    
-    console.log('MSG: Starting resize at', startX, 'with width', startWidth);
-  }
-  
-  // Mouse move handler
-  function onMouseMove(e) {
-    if (!isResizing) return;
-    
-    // Calculate how far mouse has moved from start position
-    const dx = e.clientX - startX;
-    
-    // Calculate new width based on mouse movement
-    // Since panel is anchored to right side, moving mouse right (positive dx)
-    // should make panel narrower (startWidth - dx)
-    let newWidth = startWidth - dx;
-    
-    // Apply min/max constraints
-    const minWidth = 300;
-    const maxWidth = Math.min(window.innerWidth * 0.8, 800);
-    newWidth = Math.max(minWidth, Math.min(newWidth, maxWidth));
-    
-    // Force panel to be resizable during this operation
-    chatPanel.style.setProperty('width', newWidth + 'px', 'important');
-    chatPanel.style.setProperty('max-width', newWidth + 'px', 'important');
-    chatPanel.style.setProperty('min-width', Math.min(newWidth, 300) + 'px', 'important');
-    
-    // Force a reflow to apply the changes immediately
-    void chatPanel.offsetWidth;
-    
-    console.log('MSG: Resizing to', newWidth, 'px');
-  }
-  
-  // Mouse up handler
-  function onMouseUp() {
-    if (!isResizing) return;
-    
-    // Stop resizing
-    isResizing = false;
-    
-    // Remove visual feedback
-    resizeHandle.classList.remove('active');
-    
-    // Save the new width
-    try {
-      localStorage.setItem('msgChatPanelWidth', chatPanel.style.width);
-      console.log('MSG: Saved new width:', chatPanel.style.width);
-    } catch (e) {
-      console.error('MSG: Error saving width:', e);
-    }
-    
-    // Restore transition for other properties
-    chatPanel.style.transition = originalTransition;
-    
-    // Remove overlay
-    const overlay = document.querySelector('.msg-resize-overlay');
-    if (overlay) {
-      overlay.remove();
-    }
-  }
-  
-  // Add event listeners
-  resizeHandle.addEventListener('mousedown', onMouseDown);
-  document.addEventListener('mousemove', onMouseMove);
-  document.addEventListener('mouseup', onMouseUp);
-  
-  // Store cleanup function for later
-  resizeHandle._cleanupFn = function() {
-    resizeHandle.removeEventListener('mousedown', onMouseDown);
-    document.removeEventListener('mousemove', onMouseMove);
-    document.removeEventListener('mouseup', onMouseUp);
-  };
-}
-
-// Always reset panel to default width on page refresh
-function restorePanelSize(usePageRefresh = true) {
-  if (!chatPanel) return;
-  
-  try {
-    // Default width is always 380px
-    const defaultWidth = 380;
-    
-    if (usePageRefresh) {
-      // This is called on page refresh/load - reset to default and clear saved width
-      try {
-        localStorage.removeItem('msgChatPanelWidth');
-      } catch (e) {
-        // Handle localStorage errors silently
-      }
-      
-      // Apply constraints (for consistency, though we're using default)
-      const minWidth = 300;
-      const maxWidth = window.innerWidth * 0.8;
-      const width = Math.min(Math.max(defaultWidth, minWidth), maxWidth);
-      
-      // Save current transition state
-      const originalTransition = chatPanel.style.getPropertyValue('transition');
-      
-      // Apply width directly with no transition - forced with !important
-      chatPanel.style.setProperty('transition', 'none', 'important');
-      chatPanel.style.setProperty('width', width + 'px', 'important');
-      
-      // For any site that might be applying conflicting styles:
-      chatPanel.style.setProperty('max-width', '80vw', 'important');
-      chatPanel.style.setProperty('min-width', '300px', 'important');
-      
-      // Force a reflow to apply the width immediately
-      void chatPanel.offsetHeight;
-      
-      // Restore the original transition after a small delay
-      setTimeout(() => {
-        // Only restore the transform transition, not width
-        chatPanel.style.setProperty('transition', 'transform 0.3s ease-in-out', 'important');
-      }, 100);
-      
-      console.log("MSG: Reset panel width to default", width + "px");
+  } else if (userMessage) {
+    if (isSummaryQuery) {
+      console.log('MSG: Using full context for summary query');
     } else {
-      // This is called when restoring from close/reopen - DON'T reset to default
-      // The toggleChatPanel function will handle restoring the saved width if available
-      console.log("MSG: Not resetting panel width - will use saved width if available");
+      console.log('MSG RAG: Not initialized, using full context');
     }
-  } catch (e) {
-    console.error("MSG: Error in restorePanelSize:", e);
-  }
-}
-
-// Initialize everything
-function initialize() {
-  console.log("MSG: Initializing...");
-  
-  // Create chat panel if it doesn't exist
-  if (!document.getElementById('msg-chat-panel')) {
-    createChatPanel();
-    
-    // On initial page load, make sure we reset to default width
-    setTimeout(() => {
-      restorePanelSize(true); // Pass true to reset to default width on page load
-    }, 200);
   }
   
-  // Add floating icon if it doesn't exist and not already added
-  if (!document.getElementById('msg-floating-icon') && !window.msgIconAdded) {
-    addFloatingIcon();
-  }
-  
-  // Set up keyboard event listener (remove any existing listeners first)
-  document.removeEventListener('keydown', handleKeyDown);
-  document.addEventListener('keydown', handleKeyDown);
-  
-  // Set up resize functionality
-  setupResizeHandler();
-}
-
-// Initialize when DOM is fully loaded
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', function() {
-    console.log("MSG: DOM Content Loaded");
-    initialize();
-  });
-} else {
-  console.log("MSG: Document already loaded");
-  initialize();
-}
-
-// Ensure the extension works even after dynamic page loads (SPAs)
-window.addEventListener('load', function() {
-  console.log("MSG: Window loaded");
-  if (!window.msgIconAdded) {
-    initialize();
-  }
-});
-
-// Reset variables when page is reloaded or closed
-window.addEventListener('beforeunload', function() {
-  // Reset state variables so a new session starts fresh
-  window.msgContextPrepared = false;
-  window.msgAutoSummarized = false;
-  window.msgPageInfo = null;
-  
-  // Clear any saved panel width to ensure it resets on refresh
-  try {
-    localStorage.removeItem('msgChatPanelWidth');
-  } catch (e) {
-    // Handle localStorage errors silently
-  }
-});
+  // For summary 
