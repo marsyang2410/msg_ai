@@ -19,35 +19,125 @@ window.msgAutoSummarized = false;    // Has auto-summary been performed?
 window.msgPageInfo = null;           // Extracted page content
 window.msgIconAdded = false;         // Tracks if the floating icon has been added
 
-// NEW: RAG System for temporary webpage database
+// NEW: Performance optimization - Content cache with expiration
+class ContentCache {
+  constructor() {
+    this.cache = new Map();
+    this.maxSize = 10; // Maximum cached pages
+    this.expiryTime = 30 * 60 * 1000; // 30 minutes
+  }
+  
+  generateKey(url, title) {
+    return `${url}:${title}`.substring(0, 100); // Limit key length
+  }
+  
+  set(url, title, content, embeddings = null) {
+    const key = this.generateKey(url, title);
+    
+    // Remove oldest entries if cache is full
+    if (this.cache.size >= this.maxSize) {
+      const firstKey = this.cache.keys().next().value;
+      this.cache.delete(firstKey);
+    }
+    
+    this.cache.set(key, {
+      content,
+      embeddings,
+      timestamp: Date.now(),
+      accessCount: 1
+    });
+  }
+  
+  get(url, title) {
+    const key = this.generateKey(url, title);
+    const cached = this.cache.get(key);
+    
+    if (!cached) return null;
+    
+    // Check if expired
+    if (Date.now() - cached.timestamp > this.expiryTime) {
+      this.cache.delete(key);
+      return null;
+    }
+    
+    // Update access count and timestamp
+    cached.accessCount++;
+    cached.timestamp = Date.now();
+    
+    return cached;
+  }
+  
+  clear() {
+    this.cache.clear();
+  }
+}
+
+// NEW: RAG System for temporary webpage database with performance optimizations
 class WebpageRAG {
   constructor() {
     this.chunks = [];
     this.embeddings = [];
     this.isInitialized = false;
     this.isInitializing = false;
+    this.abortController = null; // For cancelling ongoing operations
   }
 
   async initializeRAG(pageContent) {
     if (this.isInitializing) return;
     this.isInitializing = true;
     
+    // Cancel any previous initialization
+    if (this.abortController) {
+      this.abortController.abort();
+    }
+    this.abortController = new AbortController();
+    
     console.log("MSG RAG: Starting initialization...");
     
     try {
-      // Split content into semantic chunks
+      // Check cache first
+      const cached = window.msgContentCache?.get(window.location.href, document.title);
+      if (cached && cached.embeddings) {
+        console.log("MSG RAG: Using cached embeddings");
+        this.chunks = cached.content.chunks || this.createSemanticChunks(pageContent);
+        this.embeddings = cached.embeddings;
+        this.isInitialized = true;
+        console.log(`MSG RAG: Cache hit - initialized with ${this.chunks.length} chunks`);
+        return;
+      }
+      
+      // Split content into semantic chunks (optimized)
       this.chunks = this.createSemanticChunks(pageContent);
       console.log(`MSG RAG: Created ${this.chunks.length} content chunks`);
       
       // Create embeddings for each chunk
       const chunkTexts = this.chunks.map(chunk => chunk.text);
-      const embeddings = await this.getBatchEmbeddings(chunkTexts);
+      const embeddings = await this.getBatchEmbeddings(chunkTexts, this.abortController.signal);
+      
+      // Check if operation was aborted
+      if (this.abortController.signal.aborted) {
+        console.log("MSG RAG: Initialization aborted");
+        return;
+      }
+      
       this.embeddings = embeddings;
+      
+      // Cache the results
+      if (window.msgContentCache) {
+        window.msgContentCache.set(
+          window.location.href, 
+          document.title, 
+          { chunks: this.chunks, content: pageContent }, 
+          embeddings
+        );
+      }
       
       this.isInitialized = true;
       console.log(`MSG RAG: Initialization complete with ${this.chunks.length} chunks`);
     } catch (error) {
-      console.error('MSG RAG: Initialization failed:', error);
+      if (error.name !== 'AbortError') {
+        console.error('MSG RAG: Initialization failed:', error);
+      }
       this.isInitialized = false;
     } finally {
       this.isInitializing = false;
@@ -76,7 +166,8 @@ class WebpageRAG {
               chunks.push({
                 text: currentChunk.trim(),
                 type: 'paragraph_group',
-                length: currentChunk.length
+                length: currentChunk.length,
+                priority: this.calculateChunkPriority(currentChunk)
               });
             }
             currentChunk = para;
@@ -89,28 +180,74 @@ class WebpageRAG {
           chunks.push({
             text: currentChunk.trim(),
             type: 'paragraph_group',
-            length: currentChunk.length
+            length: currentChunk.length,
+            priority: this.calculateChunkPriority(currentChunk)
           });
         }
       } else {
         chunks.push({
           text: section.trim(),
           type: 'section',
-          length: section.length
+          length: section.length,
+          priority: this.calculateChunkPriority(section)
         });
       }
     });
     
-    // Ensure we don't have too many chunks (limit for free tier)
-    return chunks.slice(0, 15); // Limit to 15 chunks for efficiency
+    // Sort by priority and limit to top chunks for efficiency
+    const sortedChunks = chunks
+      .sort((a, b) => b.priority - a.priority)
+      .slice(0, 10); // Reduced from 15 to 10 for better performance
+    
+    console.log(`MSG RAG: Optimized to ${sortedChunks.length} high-priority chunks`);
+    return sortedChunks;
+  }
+  
+  // NEW: Calculate chunk priority based on content characteristics
+  calculateChunkPriority(text) {
+    let priority = 0;
+    
+    // Higher priority for chunks with headings
+    if (text.match(/^(H[1-6]:|TITLE:|META:)/m)) priority += 3;
+    
+    // Higher priority for longer, substantive content
+    if (text.length > 800) priority += 2;
+    if (text.length > 1200) priority += 1;
+    
+    // Higher priority for content with structured information
+    if (text.match(/\d+\.|•|-|\*/g)) priority += 1;
+    
+    // Lower priority for repetitive or navigation content
+    if (text.toLowerCase().includes('navigation') || 
+        text.toLowerCase().includes('menu') ||
+        text.toLowerCase().includes('footer')) priority -= 2;
+    
+    return priority;
   }
 
-  async getBatchEmbeddings(texts) {
-    return new Promise((resolve) => {
+  async getBatchEmbeddings(texts, abortSignal = null) {
+    return new Promise((resolve, reject) => {
+      // Check if operation was aborted
+      if (abortSignal?.aborted) {
+        reject(new Error('Operation aborted'));
+        return;
+      }
+      
+      const timeoutId = setTimeout(() => {
+        reject(new Error('Embedding request timeout'));
+      }, 30000); // 30 second timeout
+      
       chrome.runtime.sendMessage({
         action: 'getBatchEmbeddings',
         texts: texts
       }, (response) => {
+        clearTimeout(timeoutId);
+        
+        if (abortSignal?.aborted) {
+          reject(new Error('Operation aborted'));
+          return;
+        }
+        
         if (response && response.success) {
           resolve(response.embeddings);
         } else {
@@ -121,12 +258,29 @@ class WebpageRAG {
     });
   }
 
-  async getTextEmbedding(text) {
-    return new Promise((resolve) => {
+  async getTextEmbedding(text, abortSignal = null) {
+    return new Promise((resolve, reject) => {
+      // Check if operation was aborted
+      if (abortSignal?.aborted) {
+        reject(new Error('Operation aborted'));
+        return;
+      }
+      
+      const timeoutId = setTimeout(() => {
+        reject(new Error('Embedding request timeout'));
+      }, 10000); // 10 second timeout
+      
       chrome.runtime.sendMessage({
         action: 'getEmbedding',
         text: text.substring(0, 500) // Limit for embedding
       }, (response) => {
+        clearTimeout(timeoutId);
+        
+        if (abortSignal?.aborted) {
+          reject(new Error('Operation aborted'));
+          return;
+        }
+        
         if (response && response.success) {
           resolve(response.embedding);
         } else {
@@ -144,7 +298,7 @@ class WebpageRAG {
     
     try {
       // Get query embedding
-      const queryEmbedding = await this.getTextEmbedding(query);
+      const queryEmbedding = await this.getTextEmbedding(query, this.abortController?.signal);
       
       // Calculate cosine similarity with all chunks
       const similarities = this.embeddings.map((embedding, index) => ({
@@ -153,19 +307,35 @@ class WebpageRAG {
         chunk: this.chunks[index]
       }));
       
-      // Return top K most similar chunks
+      // Return top K most similar chunks with improved filtering
       const results = similarities
         .sort((a, b) => b.similarity - a.similarity)
         .slice(0, topK)
-        .filter(item => item.similarity > 0.1) // Minimum similarity threshold
-        .map(item => item.chunk);
+        .filter(item => item.similarity > 0.15) // Increased threshold for better quality
+        .map(item => ({
+          ...item.chunk,
+          similarity: item.similarity
+        }));
       
-      console.log(`MSG RAG: Found ${results.length} relevant chunks for query`);
+      console.log(`MSG RAG: Found ${results.length} relevant chunks for query (avg similarity: ${(results.reduce((sum, r) => sum + r.similarity, 0) / results.length || 0).toFixed(3)})`);
       return results;
     } catch (error) {
-      console.error('MSG RAG: Search failed:', error);
+      if (error.name !== 'AbortError') {
+        console.error('MSG RAG: Search failed:', error);
+      }
       return [];
     }
+  }
+  
+  // Clean up resources
+  cleanup() {
+    if (this.abortController) {
+      this.abortController.abort();
+    }
+    this.chunks = [];
+    this.embeddings = [];
+    this.isInitialized = false;
+    this.isInitializing = false;
   }
 
   cosineSimilarity(a, b) {
@@ -189,26 +359,92 @@ class WebpageRAG {
 // Global RAG instance
 window.msgRAG = new WebpageRAG();
 
-// Initialize everything
-function initialize() {
-  // Create chat panel if it doesn't exist
-  if (!document.getElementById('msg-chat-panel')) {
-    createChatPanel();
+// Global content cache instance
+window.msgContentCache = new ContentCache();
+
+// NEW: Cleanup manager for proper resource management
+class CleanupManager {
+  constructor() {
+    this.cleanupTasks = new Set();
+    this.eventListeners = new Map();
+    this.timeouts = new Set();
+    this.intervals = new Set();
   }
   
-  // Add floating icon if it doesn't exist
-  if (!document.getElementById('msg-floating-icon')) {
-    addFloatingIcon();
+  addCleanupTask(fn) {
+    this.cleanupTasks.add(fn);
   }
   
-  // Set up keyboard event listener
-  document.addEventListener('keydown', handleKeyDown);
+  removeCleanupTask(fn) {
+    this.cleanupTasks.delete(fn);
+  }
   
-  // Set up resize functionality
-  setupResizeHandler();
+  addEventListener(element, event, handler, options) {
+    if (!this.eventListeners.has(element)) {
+      this.eventListeners.set(element, new Map());
+    }
+    this.eventListeners.get(element).set(event, { handler, options });
+    element.addEventListener(event, handler, options);
+  }
+  
+  removeEventListener(element, event) {
+    const elementListeners = this.eventListeners.get(element);
+    if (elementListeners && elementListeners.has(event)) {
+      const { handler } = elementListeners.get(event);
+      element.removeEventListener(event, handler);
+      elementListeners.delete(event);
+    }
+  }
+  
+  setTimeout(fn, delay) {
+    const id = setTimeout(fn, delay);
+    this.timeouts.add(id);
+    return id;
+  }
+  
+  setInterval(fn, delay) {
+    const id = setInterval(fn, delay);
+    this.intervals.add(id);
+    return id;
+  }
+  
+  cleanup() {
+    // Execute cleanup tasks
+    this.cleanupTasks.forEach(fn => {
+      try {
+        fn();
+      } catch (error) {
+        console.error('Cleanup task failed:', error);
+      }
+    });
+    
+    // Remove event listeners
+    this.eventListeners.forEach((events, element) => {
+      events.forEach(({ handler }, event) => {
+        try {
+          element.removeEventListener(event, handler);
+        } catch (error) {
+          console.error('Failed to remove event listener:', error);
+        }
+      });
+    });
+    
+    // Clear timeouts and intervals
+    this.timeouts.forEach(id => clearTimeout(id));
+    this.intervals.forEach(id => clearInterval(id));
+    
+    // Clear collections
+    this.cleanupTasks.clear();
+    this.eventListeners.clear();
+    this.timeouts.clear();
+    this.intervals.clear();
+  }
 }
 
-// Handle keyboard events
+// Global cleanup manager
+window.msgCleanup = new CleanupManager();
+
+// Handle keyboard events with debouncing for performance
 function handleKeyDown(event) {
   // Check for '/' key (slash)
   if (event.key === '/') {
@@ -219,9 +455,12 @@ function handleKeyDown(event) {
       // Toggle chat panel
       toggleChatPanel();
       event.preventDefault();
+      
+      // Reset the timing to prevent triple-press issues
+      lastSlashPressTime = 0;
+    } else {
+      lastSlashPressTime = currentTime;
     }
-    
-    lastSlashPressTime = currentTime;
   }
 }
 
@@ -369,6 +608,9 @@ function createChatPanel() {
     
     // Force setup of resize handler after sizes are properly initialized
     setupResizeHandler();
+    
+    // Apply appearance settings
+    applyAppearanceSettings();
   }, 100);
 }
 
@@ -516,7 +758,7 @@ INSTRUCTIONS:
    - [One sentence summary for this key point]
    - [One sentence summary for this key point]
 
-   Note: Format exactly as shown with quotes around the title, bold headers (using ** on both sides), and bullet points (-) for summaries. Keep the format compact with no unnecessary empty lines.
+   Note: Format exactly as shown with quotes around the title, bold headers (using ** on both sides), and bullet points (-) for summaries. Keep the format compact with no unnecessary empty lines between sections.
    
    - Start with a quoted title: "Summarized Title"
    - Use bold section headers: **Sub Topic**
@@ -1053,28 +1295,36 @@ function sendMessage() {
   sendToGemini(message, true); // Pass true to indicate message is already added
 }
 
-// Extract page content for context
+// Extract page content for context with performance optimizations
 function extractPageContent() {
+  // Check cache first
+  const cached = window.msgContentCache.get(window.location.href, document.title);
+  if (cached && cached.content) {
+    console.log("MSG: Using cached content");
+    return {
+      url: window.location.href,
+      title: document.title,
+      content: cached.content.content || cached.content,
+      html: cached.content.html || ''
+    };
+  }
+  
+  const startTime = performance.now();
+  
   // Get page metadata
   const title = document.title;
   const url = window.location.href;
   const metaDescription = document.querySelector('meta[name="description"]')?.content || '';
   
-  // Get raw HTML (stripped of script tags for security)
-  const htmlClone = document.documentElement.cloneNode(true);
-  // Remove scripts, styles, and other non-content elements for security and size
-  const nonContentTags = htmlClone.querySelectorAll('script, style, link[rel="stylesheet"], iframe');
-  nonContentTags.forEach(tag => tag.remove());
-  const rawHtml = htmlClone.outerHTML;
-  
   // Initialize content extraction
   let mainContent = '';
-  let fullText = '';
+  let bestContent = '';
+  let contentFound = false;
   
   // Force immediate content extraction - ensure we have the latest DOM content
   document.body.getBoundingClientRect(); // Force layout reflow to ensure content is up to date
   
-  // STRATEGY 1: Try known content containers first
+  // STRATEGY 1: Try known content containers first (OPTIMIZED - early termination)
   const mainContentElements = [
     document.querySelector('main'),
     document.querySelector('article'),
@@ -1102,66 +1352,75 @@ function extractPageContent() {
     }
     
     mainContent = largestElement.innerText;
+    
+    // Early termination if we have substantial content
+    if (mainContent.length > 2000) {
+      bestContent = mainContent;
+      contentFound = true;
+      console.log("MSG: Found substantial content via semantic containers, skipping other strategies");
+    }
   }
   
-  // STRATEGY 2: Use readable content extraction algorithm
-  // Clone the document to avoid modifying the original
-  const documentClone = document.cloneNode(true);
-  const bodyClone = documentClone.body;
-  
-  // Remove non-content elements
-  const elementsToRemove = [
-    'script', 'style', 'noscript', 'iframe', 'nav', 'header', 
-    'footer', 'aside', 'form', '.nav', '.navigation', '.menu',
-    '.header', '.footer', '.sidebar', '.ads', '.comments',
-    '.social', '.share', '.related', '.recommended', 
-    '[role="banner"]', '[role="navigation"]', '[role="complementary"]'
-  ];
-  
-  elementsToRemove.forEach(selector => {
-    try {
-      bodyClone.querySelectorAll(selector).forEach(el => el.remove());
-    } catch (e) {
-      // Handle potential errors in selectors
+  // STRATEGY 2: Use readable content extraction algorithm (only if needed)
+  if (!contentFound) {
+    // Clone the document to avoid modifying the original
+    const documentClone = document.cloneNode(true);
+    const bodyClone = documentClone.body;
+    
+    // Remove non-content elements
+    const elementsToRemove = [
+      'script', 'style', 'noscript', 'iframe', 'nav', 'header', 
+      'footer', 'aside', 'form', '.nav', '.navigation', '.menu',
+      '.header', '.footer', '.sidebar', '.ads', '.comments',
+      '.social', '.share', '.related', '.recommended', 
+      '[role="banner"]', '[role="navigation"]', '[role="complementary"]'
+    ];
+    
+    elementsToRemove.forEach(selector => {
+      try {
+        bodyClone.querySelectorAll(selector).forEach(el => el.remove());
+      } catch (e) {
+        // Handle potential errors in selectors
+      }
+    });
+    
+    // Get text from remaining elements
+    const fullText = bodyClone.innerText;
+    
+    // Check if this gives us better content
+    if (fullText.length > mainContent.length * 1.2) {
+      bestContent = fullText;
+      contentFound = true;
     }
-  });
+  }
   
-  // Get text from remaining elements
-  fullText = bodyClone.innerText;
+  // STRATEGY 3: Get all paragraph text as a fallback (only if needed)
+  if (!contentFound || bestContent.length < 500) {
+    const paragraphs = Array.from(document.querySelectorAll('p'));
+    
+    // Sort paragraphs by length (descending) to prioritize content paragraphs
+    paragraphs.sort((a, b) => b.innerText.length - a.innerText.length);
+    
+    // Take top paragraphs (likely content paragraphs rather than UI elements)
+    const paragraphText = paragraphs.slice(0, 20).map(p => p.innerText.trim()).filter(t => t.length > 40).join('\n\n');
+    
+    if (paragraphText.length > bestContent.length) {
+      bestContent = paragraphText;
+    }
+  }
   
-  // STRATEGY 3: Get all paragraph text as a fallback
-  let paragraphText = '';
-  const paragraphs = Array.from(document.querySelectorAll('p'));
-  
-  // Sort paragraphs by length (descending) to prioritize content paragraphs
-  paragraphs.sort((a, b) => b.innerText.length - a.innerText.length);
-  
-  // Take top paragraphs (likely content paragraphs rather than UI elements)
-  paragraphText = paragraphs.slice(0, 20).map(p => p.innerText.trim()).filter(t => t.length > 40).join('\n\n');
-  
-  // STRATEGY 4: Extract headings for structure
+  // STRATEGY 4: Extract headings for structure (always run - lightweight)
   const headings = Array.from(document.querySelectorAll('h1, h2, h3'))
     .map(h => `${h.tagName}: ${h.innerText.trim()}`)
     .join('\n');
   
-  // Choose the best content source (longest meaningful text)
-  let content = mainContent;
-  
-  if (fullText.length > mainContent.length * 1.2) {
-    content = fullText;
-  }
-  
-  if (content.length < 500 && paragraphText.length > content.length) {
-    content = paragraphText;
-  }
-  
-  // If we still don't have good content, use the full page text
-  if (content.length < 200) {
-    content = document.body.innerText;
+  // Use fallback if still no good content
+  if (bestContent.length < 200) {
+    bestContent = document.body.innerText;
   }
   
   // Clean up the content
-  content = content
+  bestContent = bestContent
     .replace(/\s+/g, ' ')               // Normalize whitespace
     .replace(/\n\s*\n\s*\n/g, '\n\n')   // Remove excessive line breaks
     .trim();
@@ -1180,14 +1439,7 @@ function extractPageContent() {
   }
   
   // Add the main content
-  enhancedContent += `PAGE CONTENT:\n${content}\n\n`;
-  
-  // Add the raw HTML (with scripts/styles removed) for structure analysis
-  // This ensures the model has access to the full HTML structure if needed
-  enhancedContent += `PAGE HTML STRUCTURE (for reference):\n${rawHtml.substring(0, 15000)}`;
-  
-  // Set final content to enhanced version
-  content = enhancedContent;
+  enhancedContent += `PAGE CONTENT:\n${bestContent}\n\n`;
   
   // Smart content length optimization based on query type and RAG availability
   let maxContentLength;
@@ -1203,9 +1455,9 @@ function extractPageContent() {
     maxContentLength = 6000; // Moderate reduction for follow-up queries
   }
   
-  if (content.length > maxContentLength) {
+  if (enhancedContent.length > maxContentLength) {
     // Smart truncation: try to end at a sentence or paragraph boundary
-    let truncatedContent = content.substring(0, maxContentLength);
+    let truncatedContent = enhancedContent.substring(0, maxContentLength);
     
     // Find the last sentence boundary within the limit
     const lastSentence = truncatedContent.lastIndexOf('. ');
@@ -1214,30 +1466,37 @@ function extractPageContent() {
     // Use the boundary that's closer to the end but still reasonable
     const cutoff = Math.max(lastSentence, lastParagraph);
     if (cutoff > maxContentLength * 0.8) {
-      truncatedContent = content.substring(0, cutoff + (lastSentence > lastParagraph ? 2 : 2));
+      truncatedContent = enhancedContent.substring(0, cutoff + (lastSentence > lastParagraph ? 2 : 2));
     }
     
-    content = truncatedContent + '... (content continues - RAG system will provide relevant chunks for specific queries)';
+    enhancedContent = truncatedContent + '... (content continues - RAG system will provide relevant chunks for specific queries)';
   }
+  
+  const extractionTime = performance.now() - startTime;
   
   // Log extraction information for debugging
   console.log("Content extraction stats:", {
     titleLength: title.length,
     metaDescriptionLength: metaDescription.length,
     mainContentLength: mainContent.length,
-    fullTextLength: fullText.length,
-    paragraphTextLength: paragraphText.length,
-    finalContentLength: content.length,
-    htmlLength: rawHtml.length
+    finalContentLength: enhancedContent.length,
+    extractionTime: Math.round(extractionTime),
+    strategyUsed: contentFound ? 'semantic_containers' : 'full_extraction'
   });
   
-  return {
+  const result = {
     url: url,
     title: title,
-    content: content,
-    // Store only essential HTML structure for token efficiency
-    html: rawHtml.substring(0, 2000)
+    content: enhancedContent,
+    html: '' // Removed HTML storage for performance
   };
+  
+  // Cache the result
+  if (window.msgContentCache) {
+    window.msgContentCache.set(url, title, result);
+  }
+  
+  return result;
 }
 
 // Send message to Gemini API via background script
@@ -1295,12 +1554,12 @@ async function sendToGemini(userMessage, messageAlreadyAdded = false) {
       
       if (relevantChunks.length > 0) {
         const contextText = relevantChunks
-          .map((chunk, index) => `[${index + 1}] ${chunk.text}`)
+          .map((chunk, index) => `[${index + 1}] (Priority: ${chunk.priority || 0}, Similarity: ${chunk.similarity?.toFixed(3) || 'N/A'}) ${chunk.text}`)
           .join('\n\n');
         
         enhancedMessage = `[RAG] ${userMessage}\n\nRELEVANT CONTEXT:\n${contextText}`;
         useRAG = true;
-        console.log(`MSG RAG: Enhanced query with ${relevantChunks.length} relevant chunks`);
+        console.log(`MSG RAG: Enhanced query with ${relevantChunks.length} relevant chunks (avg similarity: ${(relevantChunks.reduce((sum, r) => sum + (r.similarity || 0), 0) / relevantChunks.length).toFixed(3)})`);
       } else {
         console.log('MSG RAG: No relevant chunks found, using full context');
       }
@@ -1611,7 +1870,7 @@ function addFloatingIcon() {
   window.msgIconAdded = true;
 }
 
-// Set up resize handler for the chat panel
+// Set up resize handler for the chat panel with proper cleanup
 function setupResizeHandler() {
   // Get the resize handle or create it if it doesn't exist
   let resizeHandle = document.querySelector('.msg-resize-handle');
@@ -1763,17 +2022,24 @@ function setupResizeHandler() {
     }
   }
   
-  // Add event listeners
-  resizeHandle.addEventListener('mousedown', onMouseDown);
-  document.addEventListener('mousemove', onMouseMove);
-  document.addEventListener('mouseup', onMouseUp);
+  // Use cleanup manager to properly manage event listeners
+  window.msgCleanup.addEventListener(resizeHandle, 'mousedown', onMouseDown);
+  window.msgCleanup.addEventListener(document, 'mousemove', onMouseMove);
+  window.msgCleanup.addEventListener(document, 'mouseup', onMouseUp);
   
-  // Store cleanup function for later
+  // Store cleanup function for manual cleanup if needed
   resizeHandle._cleanupFn = function() {
-    resizeHandle.removeEventListener('mousedown', onMouseDown);
-    document.removeEventListener('mousemove', onMouseMove);
-    document.removeEventListener('mouseup', onMouseUp);
+    window.msgCleanup.removeEventListener(resizeHandle, 'mousedown');
+    window.msgCleanup.removeEventListener(document, 'mousemove');
+    window.msgCleanup.removeEventListener(document, 'mouseup');
   };
+  
+  // Register cleanup task
+  window.msgCleanup.addCleanupTask(() => {
+    if (resizeHandle._cleanupFn) {
+      resizeHandle._cleanupFn();
+    }
+  });
 }
 
 // Always reset panel to default width on page refresh
@@ -1845,9 +2111,50 @@ function restorePanelSize(usePageRefresh = true) {
   }
 }
 
+// Apply appearance settings (dark mode and transparent background)
+function applyAppearanceSettings() {
+  chrome.storage.sync.get(['msgSettings'], function(result) {
+    const settings = result.msgSettings || {};
+    
+    // Apply dark mode
+    if (settings.darkMode) {
+      document.body.classList.add('msg-dark-mode');
+      if (chatPanel) {
+        chatPanel.classList.add('msg-dark-mode');
+      }
+    } else {
+      document.body.classList.remove('msg-dark-mode');
+      if (chatPanel) {
+        chatPanel.classList.remove('msg-dark-mode');
+      }
+    }
+    
+    // Apply transparent background
+    if (settings.transparentBg) {
+      if (chatPanel) {
+        chatPanel.classList.add('msg-transparent-bg');
+      }
+    } else {
+      if (chatPanel) {
+        chatPanel.classList.remove('msg-transparent-bg');
+      }
+    }
+  });
+}
+
 // Initialize everything
 function initialize() {
   console.log("MSG: Initializing...");
+  
+  // Ensure content cache is initialized
+  if (!window.msgContentCache) {
+    window.msgContentCache = new ContentCache();
+  }
+  
+  // Ensure cleanup manager is initialized
+  if (!window.msgCleanup) {
+    window.msgCleanup = new CleanupManager();
+  }
   
   // Create chat panel if it doesn't exist
   if (!document.getElementById('msg-chat-panel')) {
@@ -1870,6 +2177,9 @@ function initialize() {
   
   // Set up resize functionality
   setupResizeHandler();
+  
+  // Apply appearance settings
+  applyAppearanceSettings();
 }
 
 // Initialize when DOM is fully loaded
@@ -1891,8 +2201,22 @@ window.addEventListener('load', function() {
   }
 });
 
-// Reset variables when page is reloaded or closed
+// Reset variables when page is reloaded or closed with proper cleanup
 window.addEventListener('beforeunload', function() {
+  // Clean up all resources
+  if (window.msgRAG) {
+    window.msgRAG.cleanup();
+  }
+  
+  if (window.msgCleanup) {
+    window.msgCleanup.cleanup();
+  }
+  
+  // Clear cache on page unload to prevent memory buildup
+  if (window.msgContentCache) {
+    window.msgContentCache.clear();
+  }
+  
   // Reset state variables so a new session starts fresh
   window.msgContextPrepared = false;
   window.msgAutoSummarized = false;
@@ -1905,3 +2229,42 @@ window.addEventListener('beforeunload', function() {
     // Handle localStorage errors silently
   }
 });
+
+// NEW: Page visibility change handler for performance optimization
+document.addEventListener('visibilitychange', function() {
+  if (document.hidden) {
+    // Page is hidden, pause expensive operations
+    if (window.msgRAG && window.msgRAG.isInitializing) {
+      console.log('MSG: Pausing RAG initialization due to page visibility change');
+      window.msgRAG.cleanup();
+    }
+  } else {
+    // Page is visible again, resume operations if needed
+    if (window.msgPageInfo && !window.msgRAG.isInitialized) {
+      console.log('MSG: Resuming RAG initialization');
+      window.msgRAG.initializeRAG(window.msgPageInfo.content);
+    }
+  }
+});
+
+// NEW: Memory usage monitoring (development/debugging)
+if (typeof window.performance !== 'undefined' && window.performance.memory) {
+  const checkMemoryUsage = () => {
+    const memory = window.performance.memory;
+    const usedMB = Math.round(memory.usedJSHeapSize / 1048576);
+    const limitMB = Math.round(memory.jsHeapSizeLimit / 1048576);
+    
+    console.log(`MSG Memory: ${usedMB}MB / ${limitMB}MB (${Math.round(usedMB/limitMB*100)}%)`);
+    
+    // If memory usage is high, clear cache
+    if (usedMB > limitMB * 0.8) {
+      console.warn('MSG: High memory usage detected, clearing cache');
+      if (window.msgContentCache) {
+        window.msgContentCache.clear();
+      }
+    }
+  };
+  
+  // Check memory usage every 2 minutes
+  window.msgCleanup.setInterval(checkMemoryUsage, 120000);
+}

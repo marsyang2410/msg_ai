@@ -352,29 +352,43 @@ async function getTextEmbedding(text, apiKey) {
   }
 }
 
-// NEW: Batch embedding function for better efficiency
+// NEW: Batch embedding function for better efficiency with rate limiting
 async function getBatchEmbeddings(texts, apiKey) {
   const embeddings = [];
   
-  // Process in batches to avoid rate limits
-  const batchSize = 3; // Conservative batch size for free tier
+  // Process in smaller batches with adaptive sizing based on text length
+  const avgTextLength = texts.reduce((sum, text) => sum + text.length, 0) / texts.length;
+  const batchSize = avgTextLength > 1000 ? 2 : 3; // Smaller batches for longer texts
+  
+  console.log(`Processing ${texts.length} embeddings in batches of ${batchSize}`);
+  
   for (let i = 0; i < texts.length; i += batchSize) {
     const batch = texts.slice(i, i + batchSize);
     
-    const batchPromises = batch.map(text => 
-      getTextEmbedding(text, apiKey).catch(error => {
-        console.warn('Failed to embed text:', error);
+    const batchPromises = batch.map(async (text, index) => {
+      try {
+        // Add small delay between requests in same batch to avoid rate limits
+        if (index > 0) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        return await getTextEmbedding(text, apiKey);
+      } catch (error) {
+        console.warn(`Failed to embed text ${i + index}:`, error.message);
         return new Array(768).fill(0); // Return zero vector as fallback
-      })
-    );
+      }
+    });
     
     const batchResults = await Promise.all(batchPromises);
     embeddings.push(...batchResults);
     
-    // Small delay to respect rate limits
+    // Progressive delay between batches to respect rate limits
     if (i + batchSize < texts.length) {
-      await new Promise(resolve => setTimeout(resolve, 200));
+      const delay = Math.min(300 + (i / batchSize) * 50, 800); // Increasing delay
+      await new Promise(resolve => setTimeout(resolve, delay));
     }
+    
+    // Log progress
+    console.log(`Embedding progress: ${Math.min(i + batchSize, texts.length)}/${texts.length}`);
   }
   
   return embeddings;
