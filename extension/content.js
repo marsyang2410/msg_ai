@@ -19,6 +19,98 @@ window.msgAutoSummarized = false;    // Has auto-summary been performed?
 window.msgPageInfo = null;           // Extracted page content
 window.msgIconAdded = false;         // Tracks if the floating icon has been added
 
+// Initialize i18n support
+let i18n = null;
+
+// Initialize i18n when the page loads
+function initializeI18n() {
+  if (typeof I18n !== 'undefined') {
+    i18n = new I18n();
+    
+    // Get the current language from storage
+    chrome.storage.sync.get(['msgSettings'], function(result) {
+      const settings = result.msgSettings || {};
+      const language = settings.language || 'en';
+      i18n.setLanguage(language);
+    });
+  } else {
+    // If I18n class is not available, create a fallback
+    i18n = {
+      t: function(key) {
+        // Fallback translations for content script
+        const fallback = {
+          'chat_title': 'MSG Chat',
+          'ask_placeholder': 'Ask anything about this page...',
+          'welcome_message': 'Hi there! I\'m MSG, your website assistant. I\'ve analyzed this page and can help you understand its content with intelligent search.',
+          'grounding_enabled_all': 'Web search is enabled for all queries.',
+          'grounding_enabled_auto': 'Web search will be used automatically when needed.',
+          'grounding_enabled_explicit': 'Web search is available when you explicitly ask for it (e.g., "search for...")',
+          'content_loaded': 'Content loaded ({size}KB). {grounding} Type "summarize" for a quick overview.',
+          'content_loaded_simple': 'Content loaded ({size}KB). Type "summarize" for a quick overview.',
+          'web_search_indicator': 'Web Search',
+          'api_key_error': 'Error: Please check your API key in settings.'
+        };
+        return fallback[key] || key;
+      }
+    };
+  }
+}
+
+// Initialize when DOM is ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initializeI18n);
+} else {
+  initializeI18n();
+}
+
+// Listen for language changes
+chrome.storage.onChanged.addListener(function(changes, namespace) {
+  if (namespace === 'sync' && changes.msgSettings) {
+    const newSettings = changes.msgSettings.newValue || {};
+    const oldSettings = changes.msgSettings.oldValue || {};
+    
+    if (newSettings.language !== oldSettings.language && i18n) {
+      i18n.setLanguage(newSettings.language || 'en');
+      updateContentTranslations();
+      
+      // Update system message in chat history if context is already prepared
+      if (window.msgContextPrepared && window.msgPageInfo && chatMessages.length > 0) {
+        // Find and update the system message (should be the first message)
+        const systemMessageIndex = chatMessages.findIndex(msg => msg.role === 'system');
+        if (systemMessageIndex !== -1) {
+          // Determine if we should use full or minimal system message
+          const isMinimalSystem = chatMessages[systemMessageIndex].content.includes('You will receive relevant content chunks');
+          const newSystemMessage = isMinimalSystem ? 
+            createMinimalSystemMessage(window.msgPageInfo) : 
+            createSystemMessage(window.msgPageInfo);
+          
+          chatMessages[systemMessageIndex].content = newSystemMessage;
+        }
+      }
+    }
+  }
+});
+
+// Update translations for existing content
+function updateContentTranslations() {
+  // Update chat panel title if it exists
+  if (chatPanel) {
+    const titleElement = chatPanel.querySelector('.msg-panel-title');
+    if (titleElement) {
+      // Find the text node and update it
+      const textNode = Array.from(titleElement.childNodes).find(node => node.nodeType === Node.TEXT_NODE);
+      if (textNode) {
+        textNode.textContent = ' ' + (i18n ? i18n.t('chat_title') : 'MSG Chat');
+      }
+    }
+  }
+  
+  // Update input field placeholder if it exists
+  if (inputField) {
+    inputField.placeholder = i18n ? i18n.t('ask_placeholder') : 'Ask anything about this page...';
+  }
+}
+
 // NEW: Performance optimization - Content cache with expiration
 class ContentCache {
   constructor() {
@@ -529,7 +621,7 @@ function createChatPanel() {
     
     // Add the image to the title
     title.appendChild(logoImg);
-    title.appendChild(document.createTextNode(' MSG Chat'));
+    title.appendChild(document.createTextNode(' ' + (i18n ? i18n.t('chat_title') : 'MSG Chat')));
     console.log("Using logo URL:", logoURL);
   } catch (e) {
     console.error("Error setting logo:", e);
@@ -538,7 +630,7 @@ function createChatPanel() {
     fallbackLogo.className = 'msg-logo-fallback';
     fallbackLogo.textContent = 'M';
     title.appendChild(fallbackLogo);
-    title.appendChild(document.createTextNode(' MSG Chat'));
+    title.appendChild(document.createTextNode(' ' + (i18n ? i18n.t('chat_title') : 'MSG Chat')));
   }
   
   const closeBtn = document.createElement('button');
@@ -559,7 +651,7 @@ function createChatPanel() {
   
   inputField = document.createElement('textarea');
   inputField.className = 'msg-input';
-  inputField.placeholder = 'Ask anything about this page...';
+  inputField.placeholder = i18n ? i18n.t('ask_placeholder') : 'Ask anything about this page...';
   inputField.addEventListener('keydown', function(event) {
     // Submit on Enter (without shift)
     if (event.key === 'Enter' && !event.shiftKey) {
@@ -684,7 +776,7 @@ function toggleChatPanel() {
       window.msgContextPrepared = true;
       
       // Add welcome message (visual only, not sent to API)
-      addVisualMessage('assistant', 'Hi there! I\'m MSG, your website assistant. I\'ve analyzed this page and can help you understand its content with intelligent search.');
+      addVisualMessage('assistant', i18n ? i18n.t('welcome_message') : 'Hi there! I\'m MSG, your website assistant. I\'ve analyzed this page and can help you understand its content with intelligent search.');
       
       // Check if grounding is enabled and add a status message
       chrome.storage.sync.get(['msgSettings'], function(result) {
@@ -695,21 +787,23 @@ function toggleChatPanel() {
           
           switch(groundingMode) {
             case 'always':
-              groundingMsg = 'Web search is enabled for all queries.';
+              groundingMsg = i18n ? i18n.t('grounding_enabled_all') : 'Web search is enabled for all queries.';
               break;
             case 'auto':
-              groundingMsg = 'Web search will be used automatically when needed.';
+              groundingMsg = i18n ? i18n.t('grounding_enabled_auto') : 'Web search will be used automatically when needed.';
               break;
             case 'explicit':
-              groundingMsg = 'Web search is available when you explicitly ask for it (e.g., "search for...")';
+              groundingMsg = i18n ? i18n.t('grounding_enabled_explicit') : 'Web search is available when you explicitly ask for it (e.g., "search for...")';
               break;
           }
           
           // Update status to show context is loaded and grounding status
-          addVisualMessage('assistant', `Content loaded (${Math.round(window.msgPageInfo.content.length / 1000)}KB). ${groundingMsg} Type "summarize" for a quick overview.`);
+          const contentLoadedMsg = i18n ? i18n.t('content_loaded').replace('{size}', Math.round(window.msgPageInfo.content.length / 1000)).replace('{grounding}', groundingMsg) : `Content loaded (${Math.round(window.msgPageInfo.content.length / 1000)}KB). ${groundingMsg} Type "summarize" for a quick overview.`;
+          addVisualMessage('assistant', contentLoadedMsg);
         } else {
           // Update status to show context is loaded (visual only, not sent to API)
-          addVisualMessage('assistant', `Content loaded (${Math.round(window.msgPageInfo.content.length / 1000)}KB). Type "summarize" for a quick overview.`);
+          const contentLoadedSimpleMsg = i18n ? i18n.t('content_loaded_simple').replace('{size}', Math.round(window.msgPageInfo.content.length / 1000)) : `Content loaded (${Math.round(window.msgPageInfo.content.length / 1000)}KB). Type "summarize" for a quick overview.`;
+          addVisualMessage('assistant', contentLoadedSimpleMsg);
         }
       });
     }
@@ -734,9 +828,36 @@ function toggleChatPanel() {
   }
 }
 
+// Helper function to get language instruction for system messages
+function getLanguageInstruction() {
+  if (!i18n) return '';
+  
+  const languageNames = {
+    'en': 'English',
+    'es': 'Spanish',
+    'fr': 'French', 
+    'de': 'German',
+    'zh': 'Chinese',
+    'it': 'Italian',
+    'pt': 'Portuguese',
+    'ja': 'Japanese',
+    'ko': 'Korean',
+    'ru': 'Russian'
+  };
+  
+  const currentLang = i18n.currentLanguage || 'en';
+  const languageName = languageNames[currentLang] || 'English';
+  
+  if (currentLang === 'en') {
+    return ''; // No need to specify for English
+  }
+  
+  return `\n\nIMPORTANT: Always respond in ${languageName} language.`;
+}
+
 // Create system message for the LLM
 function createSystemMessage(pageInfo) {
-  return `You are MSG, a helpful AI assistant for user to understand the content of a webpage.
+  const baseMessage = `You are MSG, a helpful AI assistant for user to understand the content of a webpage.
 
 PAGE INFO:
 Title: "${pageInfo.title}"
@@ -777,11 +898,13 @@ INSTRUCTIONS:
 9. Maintain context between messages - if a user asks a follow-up question, understand it in the context of the previous messages and webpage content.
 10. Always answer questions about the content you've analyzed, even if they seem like follow-up questions or references to previous messages.
 11. If you use web search (grounding), always cite your sources. You can use footnote style [1] or inline mentions with URLs.`;
+
+  return baseMessage + getLanguageInstruction();
 }
 
 // NEW: Create minimal system message for RAG-enhanced queries
 function createMinimalSystemMessage(pageInfo) {
-  return `You are MSG, a helpful AI assistant for analyzing webpage content.
+  const baseMessage = `You are MSG, a helpful AI assistant for analyzing webpage content.
 
 PAGE INFO:
 Title: "${pageInfo.title}"
@@ -794,6 +917,8 @@ INSTRUCTIONS:
 4. For summaries, use this format: "[Title]" then **Section Headers** with bullet points.
 5. Stay focused on the webpage content and provided context.
 6. Never ask for additional information - work with what's provided.`;
+
+  return baseMessage + getLanguageInstruction();
 }
 
 // Add a message to the chat
@@ -823,7 +948,7 @@ function addMessage(role, content) {
       // Add grounding indicator
       const groundingIndicator = document.createElement('span');
       groundingIndicator.className = 'msg-grounding-indicator';
-      groundingIndicator.textContent = 'Web Search';
+      groundingIndicator.textContent = i18n ? i18n.t('web_search_indicator') : 'Web Search';
       messageElement.querySelector('h1, h2, p, li')?.appendChild(groundingIndicator);
     }
   } else {
@@ -862,7 +987,7 @@ function addVisualMessage(role, content) {
       // Add grounding indicator
       const groundingIndicator = document.createElement('span');
       groundingIndicator.className = 'msg-grounding-indicator';
-      groundingIndicator.textContent = 'Web Search';
+      groundingIndicator.textContent = i18n ? i18n.t('web_search_indicator') : 'Web Search';
       messageElement.querySelector('h1, h2, p, li')?.appendChild(groundingIndicator);
     }
   } else {
@@ -1613,7 +1738,7 @@ async function sendToGemini(userMessage, messageAlreadyAdded = false) {
       addMessage('assistant', response.response);
     } else {
       // Add error message
-      const errorMsg = response?.error || 'Error: Please check your API key in settings.';
+      const errorMsg = response?.error || (i18n ? i18n.t('api_key_error') : 'Error: Please check your API key in settings.');
       addMessage('assistant', errorMsg);
     }
   });

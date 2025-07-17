@@ -2,39 +2,90 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>MSG: Chat with Any Websites</title>
+  <title data-i18n="popup_title">MSG: Chat with Any Websites</title>
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="popup.css">
+  <script src="i18n.js"></script>
 </head>
 <body>
   <div class="container">
     <div class="header">
       <div class="logo">
         <img src="images/msg_logo.png" alt="MSG Logo">
-        <h1>MSG: Chat with Any Websites</h1>
+        <h1 data-i18n="popup_title">MSG: Chat with Any Websites</h1>
       </div>
     </div>
     
     <div id="api-key-section" class="api-key-prompt">
-      <h2>Enter your Gemini API Key</h2>
-      <p>Your key stays secure on your device and is never shared.</p>
-      <input type="password" id="api-key-input" placeholder="Paste your Gemini API key here">
-      <button id="save-api-key" class="button">Save Key</button>
-      <a href="https://ai.google.dev/" target="_blank" class="settings-link">Get a Gemini API key</a>
+      <h2 data-i18n="enter_api_key">Enter your Gemini API Key</h2>
+      <p data-i18n="api_key_secure">Your key stays secure on your device and is never shared.</p>
+      <input type="password" id="api-key-input" data-i18n="api_key_placeholder" placeholder="Paste your Gemini API key here">
+      <button id="save-api-key" class="button" data-i18n="save_key">Save Key</button>
+      <a href="https://aistudio.google.com/app/apikey" target="_blank" class="settings-link" data-i18n="get_api_key">🔑 Get your API key from AI Studio</a>
     </div>
     
     <div id="login-section">
-      <p>Sign in with Google for additional features (optional):</p>
-      <button id="login-button" class="button">Sign in with Google</button>
+      <p data-i18n="signin_google">Sign in with Google for additional features (optional):</p>
+      <button id="login-button" class="button" data-i18n="signin_button">Sign in with Google</button>
+      <div id="logout-section" style="display: none;">
+        <p><span data-i18n="signed_in_as">Signed in as</span> <span id="user-email"></span></p>
+        <button id="logout-button" class="button" data-i18n="sign_out">Sign Out</button>
+      </div>
+    </div>
+
+    <div id="quick-settings" class="quick-settings">
+      <h3 data-i18n="quick_settings">Quick Settings</h3>
+      <div class="setting-item">
+        <label>
+          <input type="checkbox" id="dark-mode">
+          <span data-i18n="dark_mode">Dark mode</span>
+        </label>
+      </div>
+      <div class="setting-item">
+        <label>
+          <input type="checkbox" id="transparent-bg">
+          <span data-i18n="transparent_bg">Semi-transparent background</span>
+        </label>
+      </div>
+      <div class="setting-item">
+        <label data-i18n="panel_width">Panel Width</label>
+        <select id="panel-width">
+          <option value="narrow" data-i18n="panel_narrow">Narrow</option>
+          <option value="medium" data-i18n="panel_medium">Medium</option>
+          <option value="wide" data-i18n="panel_wide">Wide</option>
+        </select>
+      </div>
+      <div class="setting-item">
+        <label>
+          <input type="checkbox" id="auto-summarize">
+          <span data-i18n="auto_summarize">Auto-suggest summary</span>
+        </label>
+      </div>
+      <div class="setting-item">
+        <label data-i18n="language">Language</label>
+        <select id="language-select">
+          <option value="en">English</option>
+          <option value="es">Español</option>
+          <option value="fr">Français</option>
+          <option value="de">Deutsch</option>
+          <option value="it">Italiano</option>
+          <option value="pt">Português</option>
+          <option value="zh">中文</option>
+          <option value="ja">日本語</option>
+          <option value="ko">한국어</option>
+          <option value="ru">Русский</option>
+        </select>
+      </div>
+      <button id="save-quick-settings" class="button" data-i18n="save_settings">Save Settings</button>
     </div>
     
     <div class="shortcut-info">
-      <p>Press <span class="shortcut-key">/</span> twice quickly to open MSG on any website</p>
+      <p data-i18n="shortcut_info">Press <span class="shortcut-key">/</span> twice quickly to open MSG on any website</p>
     </div>
     
     <div class="status" id="status-message"></div>
     
-    <a href="options.html" class="settings-link">Advanced Settings</a>
+    <a href="options.html" class="settings-link" target="_blank" data-i18n="advanced_settings">Advanced Settings</a>
   </div>
   
   <script src="popup.js"></script>

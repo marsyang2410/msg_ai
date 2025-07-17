@@ -13,6 +13,7 @@ body {
   margin: 0;
   padding: 0;
   width: 320px;
+  min-height: 480px;
   background-color: var(--msg-beige);
   color: var(--msg-brown);
 }
@@ -100,6 +101,8 @@ body {
   border-radius: 4px;
   margin: 8px 0;
   font-family: var(--font-main);
+  box-sizing: border-box;
+  max-width: 100%;
 }
 
 /* Status message */
@@ -107,6 +110,59 @@ body {
   text-align: center;
   margin: 16px 0;
   font-size: 14px;
+  padding: 8px 12px;
+  border-radius: 4px;
+}
+
+.status.success {
+  background-color: rgba(75, 181, 67, 0.2);
+  color: #2e7d32;
+}
+
+.status.error {
+  background-color: rgba(244, 67, 54, 0.2);
+  color: #d32f2f;
+}
+
+/* Quick settings section */
+.quick-settings {
+  background-color: white;
+  border-radius: 8px;
+  padding: 16px;
+  margin: 16px 0;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.quick-settings h3 {
+  font-size: 16px;
+  margin: 0 0 12px 0;
+  color: var(--msg-brown);
+}
+
+.setting-item {
+  margin-bottom: 12px;
+}
+
+.setting-item label {
+  display: block;
+  font-size: 14px;
+  color: var(--msg-brown);
+  margin-bottom: 4px;
+}
+
+.setting-item input[type="checkbox"] {
+  margin-right: 8px;
+}
+
+.setting-item select {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--msg-gray);
+  border-radius: 4px;
+  font-family: var(--font-main);
+  font-size: 14px;
+  background-color: white;
+  box-sizing: border-box;
 }
 
 /* Shortcut info */

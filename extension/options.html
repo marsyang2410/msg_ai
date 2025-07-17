@@ -2,8 +2,9 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>MSG Settings</title>
+  <title data-i18n="options_title">MSG Settings</title>
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
+  <script src="i18n.js"></script>
   <style>
     :root {
       --msg-brown: #836953;
@@ -80,6 +81,8 @@
       border-radius: 4px;
       font-family: var(--font-main);
       font-size: 14px;
+      box-sizing: border-box;
+      max-width: 100%;
     }
     
     input[type="checkbox"] {
@@ -136,87 +139,103 @@
   <div class="container">
     <div class="header">
       <img src="images/msg_logo.png" alt="MSG Logo" class="header-logo">
-      <h1>MSG Settings</h1>
+      <h1 data-i18n="options_title">MSG Settings</h1>
     </div>
     
     <div class="section">
-      <h2>API Key</h2>
+      <h2 data-i18n="api_key_section">API Key</h2>
       <div class="form-group">
-        <label for="api-key">Gemini API Key</label>
-        <input type="password" id="api-key" placeholder="Paste your Gemini API key here">
-        <p>Your key stays secure on your device and is never shared with any server.</p>
+        <label for="api-key" data-i18n="gemini_api_key">Gemini API Key</label>
+        <input type="password" id="api-key" data-i18n="api_key_placeholder" placeholder="Paste your Gemini API key here">
+        <p data-i18n="api_key_secure_server">Your key stays secure on your device and is never shared with any server.</p>
+        <a href="https://aistudio.google.com/app/apikey" target="_blank" class="settings-link" data-i18n="get_api_key">🔑 Get your API key from AI Studio</a>
       </div>
-      <button id="save-api-key" class="button">Save API Key</button>
+      <button id="save-api-key" class="button" data-i18n="save_api_key">Save API Key</button>
     </div>
     
     <div class="section">
-      <h2>Account</h2>
+      <h2 data-i18n="account_section">Account</h2>
       <div id="login-status">
-        <p>You are not signed in.</p>
-        <button id="login-button" class="button">Sign in with Google</button>
+        <p data-i18n="not_signed_in">You are not signed in.</p>
+        <button id="login-button" class="button" data-i18n="signin_button">Sign in with Google</button>
       </div>
       <div id="logout-section" style="display: none;">
-        <p>You are signed in as <span id="user-email"></span></p>
-        <button id="logout-button" class="button">Sign Out</button>
+        <p><span data-i18n="signed_in_as">You are signed in as</span> <span id="user-email"></span></p>
+        <button id="logout-button" class="button" data-i18n="sign_out">Sign Out</button>
       </div>
     </div>
     
     <div class="section">
-      <h2>Appearance</h2>
+      <h2 data-i18n="appearance_section">Appearance</h2>
       <div class="form-group">
         <label>
           <input type="checkbox" id="dark-mode">
-          Use dark mode (otherwise follows system setting)
+          <span data-i18n="use_dark_mode">Use dark mode (otherwise follows system setting)</span>
         </label>
       </div>
       <div class="form-group">
         <label>
           <input type="checkbox" id="transparent-bg">
-          Use semi-transparent background
+          <span data-i18n="use_transparent_bg">Use semi-transparent background</span>
         </label>
+      </div>
+      <div class="form-group">
+        <label data-i18n="language">Language</label>
+        <select id="language-select">
+          <option value="en">English</option>
+          <option value="es">Español</option>
+          <option value="fr">Français</option>
+          <option value="de">Deutsch</option>
+          <option value="it">Italiano</option>
+          <option value="pt">Português</option>
+          <option value="zh">中文</option>
+          <option value="ja">日本語</option>
+          <option value="ko">한국어</option>
+          <option value="ru">Русский</option>
+        </select>
       </div>
     </div>
     
     <div class="section">
-      <h2>Behavior</h2>
+      <h2 data-i18n="behavior_section">Behavior</h2>
       <div class="form-group">
-        <label>Panel Width</label>
+        <label data-i18n="panel_width">Panel Width</label>
         <select id="panel-width">
-          <option value="narrow">Narrow (300px)</option>
-          <option value="medium" selected>Medium (380px)</option>
-          <option value="wide">Wide (450px)</option>
+          <option value="narrow" data-i18n="panel_width_narrow">Narrow (300px)</option>
+          <option value="medium" selected data-i18n="panel_width_medium">Medium (380px)</option>
+          <option value="wide" data-i18n="panel_width_wide">Wide (450px)</option>
         </select>
       </div>
       <div class="form-group">
         <label>
           <input type="checkbox" id="auto-summarize">
-          Automatically suggest a summary when panel opens
+          <span data-i18n="auto_summarize_full">Automatically suggest a summary when panel opens</span>
         </label>
       </div>
       <div class="form-group">
         <label>
           <input type="checkbox" id="enable-grounding">
-          Enable Google Grounding (makes responses more accurate by searching the web)
+          <span data-i18n="enable_grounding">Enable Google Grounding (makes responses more accurate by searching the web)</span>
         </label>
       </div>
       <div class="form-group" id="grounding-settings">
-        <label>When to use grounding:</label>
+        <label data-i18n="grounding_when">When to use grounding:</label>
         <select id="grounding-mode">
-          <option value="auto">Automatic (when needed)</option>
-          <option value="always">Always</option>
-          <option value="explicit">Only when user asks</option>
+          <option value="auto" data-i18n="grounding_auto">Automatic (when needed)</option>
+          <option value="always" data-i18n="grounding_always">Always</option>
+          <option value="explicit" data-i18n="grounding_explicit">Only when user asks</option>
         </select>
       </div>
     </div>
     
     <div class="section">
-      <h2>Keyboard Shortcut</h2>
-      <p>Open/close MSG panel: Press <span class="shortcut-key">/</span> twice quickly</p>
+      <h2 data-i18n="keyboard_shortcut">Keyboard Shortcut</h2>
+      <p data-i18n="shortcut_description">Open/close MSG panel: Press <span class="shortcut-key">/</span> twice quickly</p>
     </div>
     
     <div id="status-message" class="status" style="display: none;"></div>
     
-    <button id="save-settings" class="button">Save All Settings</button>
+    <button id="save-settings" class="button" data-i18n="save_all_settings">Save All Settings</button>
   </div>
   
   <script src="options.js"></script>

@@ -16,21 +16,50 @@ document.addEventListener('DOMContentLoaded', function() {
   const enableGroundingCheckbox = document.getElementById('enable-grounding');
   const groundingModeSelect = document.getElementById('grounding-mode');
   const groundingSettings = document.getElementById('grounding-settings');
+  const languageSelect = document.getElementById('language-select');
 
   // Load saved settings
   loadSettings();
+
+  // Handle language change
+  if (languageSelect) {
+    languageSelect.addEventListener('change', function() {
+      const selectedLanguage = this.value;
+      window.i18n.setLanguage(selectedLanguage);
+      window.i18n.updatePageTranslations();
+      
+      // Save language preference immediately
+      chrome.storage.sync.get(['msgSettings'], function(result) {
+        const existingSettings = result.msgSettings || {};
+        const mergedSettings = { ...existingSettings, language: selectedLanguage };
+        chrome.storage.sync.set({ msgSettings: mergedSettings });
+      });
+    });
+  }
+
+  // Listen for storage changes to sync with popup
+  chrome.storage.onChanged.addListener(function(changes, namespace) {
+    if (namespace === 'sync' && changes.msgSettings) {
+      loadSettings();
+    }
+    if (namespace === 'sync' && changes.userInfo) {
+      chrome.storage.sync.get(['userInfo'], function(result) {
+        updateLoginState(result.userInfo);
+      });
+    }
+  });
 
   // Save API key
   saveApiKeyButton.addEventListener('click', function() {
     const apiKey = apiKeyInput.value.trim();
     
     if (!apiKey) {
-      showStatus('Please enter a valid API key', 'error');
+      showStatus(window.i18n.t('invalid_api_key'), 'error');
       return;
     }
     
     chrome.storage.sync.set({ geminiApiKey: apiKey }, function() {
-      showStatus('API key saved successfully!', 'success');
+      showStatus(window.i18n.t('api_key_saved'), 'success');
     });
   });
 
@@ -42,11 +71,18 @@ document.addEventListener('DOMContentLoaded', function() {
       panelWidth: panelWidthSelect.value,
       autoSummarize: autoSummarizeCheckbox.checked,
       enableGrounding: enableGroundingCheckbox.checked,
-      groundingMode: groundingModeSelect.value
+      groundingMode: groundingModeSelect.value,
+      language: languageSelect ? languageSelect.value : 'en'
     };
     
-    chrome.storage.sync.set({ msgSettings: settings }, function() {
-      showStatus('Settings saved successfully!', 'success');
+    // Get existing settings and merge with new ones to preserve any other settings
+    chrome.storage.sync.get(['msgSettings'], function(result) {
+      const existingSettings = result.msgSettings || {};
+      const mergedSettings = { ...existingSettings, ...settings };
+      
+      chrome.storage.sync.set({ msgSettings: mergedSettings }, function() {
+        showStatus(window.i18n.t('settings_saved'), 'success');
+      });
     });
   });
 
@@ -54,7 +90,7 @@ document.addEventListener('DOMContentLoaded', function() {
   loginButton.addEventListener('click', function() {
     chrome.identity.getAuthToken({ interactive: true }, function(token) {
       if (chrome.runtime.lastError) {
-        showStatus('Sign in failed: ' + chrome.runtime.lastError.message, 'error');
+        showStatus(window.i18n.t('signin_failed') + ': ' + chrome.runtime.lastError.message, 'error');
         return;
       }
       
@@ -68,11 +104,11 @@ document.addEventListener('DOMContentLoaded', function() {
       .then(data => {
         chrome.storage.sync.set({ userInfo: data }, function() {
           updateLoginState(data);
-          showStatus('Signed in successfully', 'success');
+          showStatus(window.i18n.t('signin_successful'), 'success');
         });
       })
       .catch(error => {
-        showStatus('Failed to get user info: ' + error, 'error');
+        showStatus(window.i18n.t('signin_failed') + ': ' + error, 'error');
       });
     });
   });
@@ -83,17 +119,16 @@ document.addEventListener('DOMContentLoaded', function() {
       if (token) {
         // Revoke token
         fetch('https://accounts.google.com/o/oauth2/revoke?token=' + token)
-          .then(() => {
-            chrome.identity.removeCachedAuthToken({ token: token }, function() {
-              chrome.storage.sync.remove('userInfo', function() {
-                updateLoginState(null);
-                showStatus('Signed out successfully', 'success');
+          .then(() => {              chrome.identity.removeCachedAuthToken({ token: token }, function() {
+                chrome.storage.sync.remove('userInfo', function() {
+                  updateLoginState(null);
+                  showStatus(window.i18n.t('signout_successful'), 'success');
+                });
               });
+            })
+            .catch(error => {
+              showStatus(window.i18n.t('signout_failed') + ': ' + error, 'error');
             });
-          })
-          .catch(error => {
-            showStatus('Logout error: ' + error, 'error');
-          });
       }
     });
   });
@@ -125,11 +160,22 @@ document.addEventListener('DOMContentLoaded', function() {
         enableGroundingCheckbox.checked = result.msgSettings.enableGrounding || false;
         groundingModeSelect.value = result.msgSettings.groundingMode || 'auto';
         
+        if (languageSelect) {
+          languageSelect.value = result.msgSettings.language || 'en';
+        }
+        
+        // Set language and update translations
+        window.i18n.setLanguage(result.msgSettings.language || 'en');
+        window.i18n.updatePageTranslations();
+        
         // Set initial visibility of grounding settings
         groundingSettings.style.display = enableGroundingCheckbox.checked ? 'block' : 'none';
       } else {
         // Default state for grounding settings
         groundingSettings.style.display = 'none';
+        // Default language
+        window.i18n.setLanguage('en');
+        window.i18n.updatePageTranslations();
       }
     });
   }
