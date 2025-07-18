@@ -659,24 +659,26 @@ function createChatPanel() {
       sendMessage();
     }
     
-    // Auto-resize textarea with minimum height matching the button
+    // Auto-resize textarea with minimum height matching the new design
     setTimeout(() => {
-      inputField.style.height = '36px'; // Reset to default height (matches button)
-      const newHeight = Math.max(36, Math.min(inputField.scrollHeight, 120));
+      inputField.style.height = '48px'; // Reset to default height (matches new design)
+      const newHeight = Math.max(48, Math.min(inputField.scrollHeight, 120));
       inputField.style.height = newHeight + 'px';
     }, 0);
   });
   
   // Also handle input event for dynamic resizing while typing
   inputField.addEventListener('input', function() {
-    inputField.style.height = '36px'; // Reset to default height
-    const newHeight = Math.max(36, Math.min(inputField.scrollHeight, 120));
+    inputField.style.height = '48px'; // Reset to default height
+    const newHeight = Math.max(48, Math.min(inputField.scrollHeight, 120));
     inputField.style.height = newHeight + 'px';
   });
   
   sendButton = document.createElement('button');
   sendButton.className = 'msg-send-btn';
   sendButton.innerHTML = '→';
+  sendButton.setAttribute('aria-label', 'Send message');
+  sendButton.setAttribute('title', 'Send message (Enter)');
   sendButton.addEventListener('click', sendMessage);
   
   inputContainer.appendChild(inputField);
@@ -1414,7 +1416,7 @@ function sendMessage() {
   
   // Clear input field
   inputField.value = '';
-  inputField.style.height = '36px'; // Reset to default height that matches button
+  inputField.style.height = '48px'; // Reset to default height that matches new design
   
   // Send to Gemini without re-adding the message to chat
   sendToGemini(message, true); // Pass true to indicate message is already added
