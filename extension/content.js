@@ -651,6 +651,8 @@ function createChatPanel() {
   
   inputField = document.createElement('textarea');
   inputField.className = 'msg-input';
+  inputField.id = 'msg-chat-input';
+  inputField.name = 'msg-chat-input';
   inputField.placeholder = i18n ? i18n.t('ask_placeholder') : 'Ask anything about this page...';
   inputField.addEventListener('keydown', function(event) {
     // Submit on Enter (without shift)
@@ -681,8 +683,40 @@ function createChatPanel() {
   sendButton.setAttribute('title', 'Send message (Enter)');
   sendButton.addEventListener('click', sendMessage);
   
-  inputContainer.appendChild(inputField);
-  inputContainer.appendChild(sendButton);
+  // Create summarize button
+  const summarizeButton = document.createElement('button');
+  summarizeButton.className = 'msg-summarize-btn';
+  summarizeButton.textContent = 'Summarize';
+  summarizeButton.setAttribute('aria-label', 'Fill summarize text');
+  summarizeButton.setAttribute('title', 'Fill "Summarize" in textarea');
+  summarizeButton.addEventListener('click', function() {
+    inputField.value = 'Summarize webpage';
+    inputField.focus();
+    // Trigger input event to resize textarea if needed
+    inputField.dispatchEvent(new Event('input'));
+  });
+  
+  // Create wrapper for rounded border
+  const inputWrapper = document.createElement('div');
+  inputWrapper.className = 'msg-input-wrapper';
+  
+  // Create input row for input field only
+  const inputRow = document.createElement('div');
+  inputRow.className = 'msg-input-row';
+  
+  inputRow.appendChild(inputField);
+  
+  // Create button row for summarize and send buttons
+  const buttonRow = document.createElement('div');
+  buttonRow.className = 'msg-button-row';
+  
+  buttonRow.appendChild(summarizeButton);
+  buttonRow.appendChild(sendButton);
+  
+  inputWrapper.appendChild(inputRow);
+  inputWrapper.appendChild(buttonRow);
+  
+  inputContainer.appendChild(inputWrapper);
   
   // Assemble the panel
   chatPanel.appendChild(header);
@@ -960,7 +994,22 @@ function addMessage(role, content) {
   
   // Add to container
   chatContainer.appendChild(messageElement);
-  
+
+  // Remove any previous spacer
+  const oldSpacer = chatContainer.querySelector('.msg-bottom-spacer');
+  if (oldSpacer) oldSpacer.remove();
+
+  // If this is the last message and it's an assistant message, add a spacer
+  if (role === 'assistant') {
+    const spacer = document.createElement('span');
+    spacer.className = 'msg-bottom-spacer';
+    spacer.style.display = 'block';
+    spacer.style.width = '100%';
+    spacer.style.height = '32px'; // match or slightly exceed input container height
+    spacer.style.background = 'transparent';
+    chatContainer.appendChild(spacer);
+  }
+
   // Scroll to bottom
   chatContainer.scrollTop = chatContainer.scrollHeight;
 }

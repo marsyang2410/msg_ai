@@ -62,7 +62,9 @@
   flex-direction: column !important;
   transition: transform 0.3s ease-in-out !important; /* ONLY transform transition, not width */
   transform: translateX(100%) !important;
-  border-left: 2px solid #D4A373 !important;
+  border-left: none !important;
+  border-top-left-radius: 12px !important;
+  border-bottom-left-radius: 12px !important;
   overflow: hidden !important;
   min-width: 300px !important; 
   max-width: 80vw; /* Removed !important to allow dynamic resizing */
@@ -89,7 +91,7 @@
   width: 6px !important; /* Narrower for less intrusion */
   height: 100% !important;
   cursor: ew-resize !important;
-  background-color: rgba(212, 163, 115, 0.2) !important; /* More subtle transparency */
+  background-color: transparent !important; /* Completely invisible */
   z-index: 2147483640 !important; /* Ensure it's above other elements but below panel */
   pointer-events: auto !important;
   touch-action: none !important; /* Disable touch scrolling during resize */
@@ -104,26 +106,26 @@
 #msg-chat-panel .msg-resize-handle::before {
   content: "" !important;
   position: absolute !important;
-  left: 2px !important; /* Centered in the narrower handle */
+  left: 2px !important;
   top: 50% !important;
-  height: 60px !important; /* Taller for better visibility */
-  width: 2px !important; /* Slightly thinner line */
+  height: 40px !important;
+  width: 4px !important;
   background-color: #D4A373 !important;
   transform: translateY(-50%) !important;
-  opacity: 0.3 !important; /* More subtle */
-  transition: opacity 0.2s !important;
-  border-radius: 1px !important;
+  opacity: 0.7 !important;
+  border-radius: 3px !important;
+  box-shadow: 0 0 4px rgba(0,0,0,0.08);
 }
 
 #msg-chat-panel .msg-resize-handle:hover,
 #msg-chat-panel .msg-resize-handle.active {
-  background-color: rgba(212, 163, 115, 0.3) !important;
+  background-color: transparent !important; /* Keep invisible on hover */
   width: 6px !important; /* Keep same width on hover */
 }
 
 #msg-chat-panel .msg-resize-handle:hover::before,
 #msg-chat-panel .msg-resize-handle.active::before {
-  opacity: 0.8 !important;
+  opacity: 0 !important; /* Keep invisible on hover */
   width: 2px !important;
 }
 
@@ -148,7 +150,7 @@
   justify-content: space-between !important;
   align-items: center !important;
   padding: 12px 16px !important;
-  background-color: #D4A373 !important;
+  background-color: #333333f2 !important;
   color: white !important;
   font-size: 16px !important;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif !important;
@@ -167,7 +169,8 @@
   width: 24px !important;
   height: 24px !important;
   margin-right: 8px !important;
-  object-fit: contain !important;
+  object-fit: cover !important;
+  border-radius: 50% !important;
 }
 
 #msg-chat-panel .msg-close-btn {
@@ -193,7 +196,7 @@
   flex: 1 !important;
   overflow-y: auto !important;
   overflow-x: visible !important; /* Allow horizontal scrolling for tables */
-  padding: 16px !important;
+  padding: 16px 16px 84px 16px !important; /* Extra bottom padding for input area */
   background-color: rgba(246, 231, 215, 0.95) !important;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif !important;
   width: 100% !important; /* Take up full width of the panel */
@@ -204,7 +207,8 @@
 
 #msg-chat-panel .msg-message {
   margin-bottom: 16px !important;
-  max-width: 85% !important;
+  max-width: 100% !important;
+  width: 100% !important;
   border-radius: 12px !important;
   padding: 10px 14px !important;
   line-height: 1.4 !important;
@@ -219,7 +223,7 @@
 }
 
 #msg-chat-panel .msg-user-message {
-  background-color: #B24D3E !important;
+  background-color: #d4a373 !important;
   color: white !important;
   align-self: flex-end !important;
   margin-left: auto !important;
@@ -434,39 +438,68 @@
 
 #msg-chat-panel .msg-input-container {
   display: flex !important;
+  flex-direction: column !important; /* Stack vertically */
   padding: 12px 16px !important;
   border-top: 1px solid transparent !important;
-  background-color: rgba(246, 231, 215, 0.95) !important;
-  align-items: center !important; /* Vertically center the input and button */
-  position: relative !important; /* For absolute positioning of button */
+  background-color: transparent !important;
+  position: absolute !important; /* Position absolutely to overlay chat content */
+  bottom: 0 !important; /* Stick to bottom */
+  left: 0 !important; /* Full width alignment */
+  right: 0 !important; /* Full width alignment */
+  z-index: 10 !important; /* Ensure it's above chat content */
+}
+
+/* Wrapper for rounded border */
+#msg-chat-panel .msg-input-wrapper {
+  display: flex !important;
+  flex-direction: column !important;
+  border: 1px solid #D9D9D9 !important;
+  border-radius: 24px !important;
+  padding: 12px !important;
+  background-color: white !important;
+}
+
+/* Top row with input and send button */
+#msg-chat-panel .msg-input-row {
+  display: flex !important;
+  align-items: center !important;
+  position: relative !important;
+  margin-bottom: 3px !important;
+}
+
+/* Button row for summarize and send buttons */
+#msg-chat-panel .msg-button-row {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  margin-left: 12px !important;
 }
 
 #msg-chat-panel .msg-input {
   flex: 1 !important;
-  border: 1px solid #D9D9D9 !important;
-  border-radius: 24px !important;
-  padding: 12px 50px 12px 16px !important; /* Extra right padding for button */
+  border: none !important; /* Remove border as requested */
+  border-radius: 0 !important;
+  padding: 6px 12px !important; /* Reduced left/right padding to align with summarize button */
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif !important;
   font-size: 14px !important;
   resize: none !important;
   min-height: 20px !important; /* Changed height to min-height */
-  height: 48px !important; /* Taller for better touch targets */
+  height: 40px !important; /* Taller for better touch targets */
   max-height: 120px !important;
   overflow-y: auto !important;
-  background-color: white !important;
+  background-color: transparent !important; /* Transparent since wrapper has white background */
   color: #333 !important;
   line-height: 1.4 !important; /* Consistent line height */
   box-sizing: border-box !important; /* Ensure padding is included in height */
   user-select: text !important; /* Enable text selection in the input field */
   -webkit-user-select: text !important; /* For Safari compatibility */
   width: 100% !important;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
+  transition: none !important; /* Remove transitions since no border */
 }
 
 #msg-chat-panel .msg-input:focus {
   outline: none !important;
-  border-color: #D4A373 !important;
-  box-shadow: 0 0 0 2px rgba(212, 163, 115, 0.2) !important;
+  box-shadow: none !important;
 }
 
 #msg-chat-panel .msg-input::placeholder {
@@ -486,17 +519,33 @@
   align-items: center !important;
   justify-content: center !important;
   font-size: 16px !important;
-  position: absolute !important;
-  right: 24px !important; /* 16px container padding + 8px from edge */
-  top: 50% !important;
-  transform: translateY(-50%) !important;
   transition: background-color 0.2s ease !important;
   z-index: 10 !important;
 }
 
 #msg-chat-panel .msg-send-btn:hover {
   background-color: #B24D3E !important;
-  transform: translateY(-50%) scale(1.05) !important;
+  transform: scale(1.05) !important;
+}
+
+/* Summarize button */
+#msg-chat-panel .msg-summarize-btn {
+  background-color: transparent !important;
+  color: #5d5d5d !important;
+  border: 1px solid #D9D9D9 !important;
+  border-radius: 16px !important;
+  padding: 8px 12px !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif !important;
+  align-self: flex-start !important;
+}
+
+#msg-chat-panel .msg-summarize-btn:hover {
+  background-color: #D4A373 !important;
+  color: white !important;
 }
 
 #msg-chat-panel .msg-loading {
@@ -569,6 +618,7 @@
   
   #msg-chat-panel .msg-chat-container {
     background-color: rgba(51, 51, 51, 0.95) !important;
+    padding: 16px 16px 84px 16px !important; /* Extra bottom padding for input area */
     user-select: text !important; /* Ensure text selection works in dark mode too */
     -webkit-user-select: text !important;
   }
@@ -593,29 +643,39 @@
   }
   
   #msg-chat-panel .msg-input-container {
-    background-color: rgba(51, 51, 51, 0.95) !important;
+    background-color: transparent !important;
+  }
+  
+  #msg-chat-panel .msg-input-wrapper {
+    border-color: #555 !important;
+    background-color: #2a2a2a !important;
   }
   
   #msg-chat-panel .msg-input {
-    background-color: #333 !important;
-    color: #f0f0f0 !important;
-    border-color: #555 !important;
+    background-color: transparent !important; /* Transparent since wrapper has background */
+    color: #ffffff !important; /* White text in dark mode */
     user-select: text !important; /* Enable text selection in dark mode too */
     -webkit-user-select: text !important;
   }
   
-  #msg-chat-panel .msg-input:focus {
-    border-color: #D4A373 !important;
-    box-shadow: 0 0 0 2px rgba(212, 163, 115, 0.3) !important;
+  #msg-chat-panel .msg-input::placeholder {
+    color: #ccc !important;
   }
   
-  #msg-chat-panel .msg-input::placeholder {
-    color: #aaa !important;
+  #msg-chat-panel .msg-summarize-btn {
+    background-color: transparent !important;
+    color: #f3f3f3 !important;
+    border: 1px solid #D9D9D9 !important;
+  }
+  
+  #msg-chat-panel .msg-summarize-btn:hover {
+    background-color: #D4A373 !important;
+    color: #2a2a2a !important;
   }
   
   #msg-chat-panel .msg-resize-handle:hover,
   #msg-chat-panel .msg-resize-handle.active {
-    background-color: rgba(212, 163, 115, 0.5) !important;
+    background-color: transparent !important; /* Keep invisible in dark mode too */
   }
   
   /* Dark mode for formatted content */
@@ -849,34 +909,6 @@
 }
 
 /* Responsive table on smaller screens */
-@media (max-width: 600px) {
-  #msg-chat-panel .msg-message .msg-table {
-    font-size: 12px !important;
-  }
-  
-  #msg-chat-panel .msg-message .msg-table th,
-  #msg-chat-panel .msg-message .msg-table td {
-    padding: 8px 12px !important;
-  }
-  
-  /* Mobile optimizations for integrated input design */
-  #msg-chat-panel .msg-input-container {
-    padding: 8px 12px !important;
-  }
-  
-  #msg-chat-panel .msg-input {
-    padding: 10px 45px 10px 14px !important; /* Smaller padding on mobile */
-    height: 44px !important; /* Slightly smaller on mobile */
-    font-size: 16px !important; /* Prevent zoom on iOS */
-  }
-  
-  #msg-chat-panel .msg-send-btn {
-    width: 30px !important;
-    height: 30px !important;
-    right: 20px !important; /* Adjust for smaller container padding */
-    font-size: 14px !important;
-  }
-}
 
 /* Floating Icon */
 #msg-floating-icon {
