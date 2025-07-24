@@ -73,7 +73,10 @@ class I18n {
         'content_loaded': 'Content loaded ({size}KB). {grounding} Type "summarize" for a quick overview.',
         'content_loaded_simple': 'Content loaded ({size}KB). Type "summarize" for a quick overview.',
         'web_search_indicator': 'Web Search',
-        'api_key_error': 'Error: Please check your API key in settings.'
+        'api_key_error': 'Error: Please check your API key in settings.',
+        'summarize_insert': 'Summarize webpage',
+        'summarize_btn': 'Summarize',
+        'clear_chat_btn': 'Clear Chat'
       },
       
       es: {
@@ -146,7 +149,10 @@ class I18n {
         'content_loaded': 'Contenido cargado ({size}KB). {grounding} Escribe "resumir" para una vista rápida.',
         'content_loaded_simple': 'Contenido cargado ({size}KB). Escribe "resumir" para una vista rápida.',
         'web_search_indicator': 'Búsqueda Web',
-        'api_key_error': 'Error: Por favor verifica tu clave API en configuración.'
+        'api_key_error': 'Error: Por favor verifica tu clave API en configuración.',
+        'summarize_insert': 'Resumir página web',
+        'summarize_btn': 'Resumir',
+        'clear_chat_btn': 'Borrar chat'
       },
       
       fr: {
@@ -219,7 +225,10 @@ class I18n {
         'content_loaded': 'Contenu chargé ({size}KB). {grounding} Tapez "résumer" pour un aperçu rapide.',
         'content_loaded_simple': 'Contenu chargé ({size}KB). Tapez "résumer" pour un aperçu rapide.',
         'web_search_indicator': 'Recherche Web',
-        'api_key_error': 'Erreur: Veuillez vérifier votre clé API dans les paramètres.'
+        'api_key_error': 'Erreur: Veuillez vérifier votre clé API dans les paramètres.',
+        'summarize_insert': 'Résumer la page web',
+        'summarize_btn': 'Résumer',
+        'clear_chat_btn': 'Effacer le chat'
       },
       
       de: {
@@ -292,7 +301,10 @@ class I18n {
         'content_loaded': 'Inhalt geladen ({size}KB). {grounding} Tippen Sie "zusammenfassen" für eine schnelle Übersicht.',
         'content_loaded_simple': 'Inhalt geladen ({size}KB). Tippen Sie "zusammenfassen" für eine schnelle Übersicht.',
         'web_search_indicator': 'Websuche',
-        'api_key_error': 'Fehler: Bitte überprüfen Sie Ihren API-Schlüssel in den Einstellungen.'
+        'api_key_error': 'Fehler: Bitte überprüfen Sie Ihren API-Schlüssel in den Einstellungen.',
+        'summarize_insert': 'Webseite zusammenfassen',
+        'summarize_btn': 'Zusammenfassen',
+        'clear_chat_btn': 'Chat löschen'
       },
       
       zh: {
@@ -356,7 +368,7 @@ class I18n {
         'signout_failed': '登出错误',
         
         // Content script messages
-        'chat_title': 'MSG 聊天',
+        'chat_title': 'MSG 聊天室',
         'ask_placeholder': '询问关于这个页面的任何内容...',
         'welcome_message': '你好！我是 MSG，你的网站助手。我已经分析了这个页面，可以帮助你通过智能搜索理解其内容。',
         'grounding_enabled_all': '网络搜索已为所有查询启用。',
@@ -365,7 +377,10 @@ class I18n {
         'content_loaded': '内容已加载（{size}KB）。{grounding} 输入"总结"获取快速概览。',
         'content_loaded_simple': '内容已加载（{size}KB）。输入"总结"获取快速概览。',
         'web_search_indicator': '网络搜索',
-        'api_key_error': '错误：请检查设置中的 API 密钥。'
+        'api_key_error': '错误：请检查设置中的 API 密钥。',
+        'summarize_insert': '总结网页',
+        'summarize_btn': '总结',
+        'clear_chat_btn': '清除聊天'
       },
       
       it: {
@@ -438,7 +453,10 @@ class I18n {
         'content_loaded': 'Contenuto caricato ({size}KB). {grounding} Digita "riassumi" per una panoramica rapida.',
         'content_loaded_simple': 'Contenuto caricato ({size}KB). Digita "riassumi" per una panoramica rapida.',
         'web_search_indicator': 'Ricerca Web',
-        'api_key_error': 'Errore: Controlla la tua chiave API nelle impostazioni.'
+        'api_key_error': 'Errore: Controlla la tua chiave API nelle impostazioni.',
+        'summarize_insert': 'Riassumi pagina web',
+        'summarize_btn': 'Riassumi',
+        'clear_chat_btn': 'Cancella chat'
       },
       
       pt: {
@@ -511,7 +529,10 @@ class I18n {
         'content_loaded': 'Conteúdo carregado ({size}KB). {grounding} Digite "resumir" para uma visão geral rápida.',
         'content_loaded_simple': 'Conteúdo carregado ({size}KB). Digite "resumir" para uma visão geral rápida.',
         'web_search_indicator': 'Busca Web',
-        'api_key_error': 'Erro: Verifique sua chave API nas configurações.'
+        'api_key_error': 'Erro: Verifique sua chave API nas configurações.',
+        'summarize_insert': 'Resumir página web',
+        'summarize_btn': 'Resumir',
+        'clear_chat_btn': 'Limpar chat'
       },
       
       ja: {
@@ -584,7 +605,10 @@ class I18n {
         'content_loaded': 'コンテンツを読み込みました（{size}KB）。{grounding} 「要約」と入力すると概要を表示します。',
         'content_loaded_simple': 'コンテンツを読み込みました（{size}KB）。「要約」と入力すると概要を表示します。',
         'web_search_indicator': 'Web検索',
-        'api_key_error': 'エラー: 設定でAPIキーを確認してください。'
+        'api_key_error': 'エラー: 設定でAPIキーを確認してください。',
+        'summarize_insert': 'ウェブページを要約',
+        'summarize_btn': '要約',
+        'clear_chat_btn': 'チャットをクリア'
       },
       
       ko: {
@@ -657,7 +681,10 @@ class I18n {
         'content_loaded': '콘텐츠를 로드했습니다 ({size}KB). {grounding} 빠른 개요를 보려면 "요약"을 입력하세요.',
         'content_loaded_simple': '콘텐츠를 로드했습니다 ({size}KB). 빠른 개요를 보려면 "요약"을 입력하세요.',
         'web_search_indicator': '웹 검색',
-        'api_key_error': '오류: 설정에서 API 키를 확인하세요.'
+        'api_key_error': '오류: 설정에서 API 키를 확인하세요.',
+        'summarize_insert': '웹페이지 요약',
+        'summarize_btn': '요약',
+        'clear_chat_btn': '채팅 지우기'
       },
       
       ru: {
@@ -730,7 +757,81 @@ class I18n {
         'content_loaded': 'Контент загружен ({size}КБ). {grounding} Введите "суммировать" для быстрого обзора.',
         'content_loaded_simple': 'Контент загружен ({size}КБ). Введите "суммировать" для быстрого обзора.',
         'web_search_indicator': 'Веб-поиск',
-        'api_key_error': 'Ошибка: Проверьте ваш API ключ в настройках.'
+        'api_key_error': 'Ошибка: Проверьте ваш API ключ в настройках.',
+        'summarize_insert': 'Суммировать веб-страницу',
+        'summarize_btn': 'Суммировать',
+        'clear_chat_btn': 'Очистить чат'
+      },
+      
+      zh_tw: {
+        'popup_title': 'MSG: 與任何網站聊天',
+        'enter_api_key': '輸入您的 Gemini API 密鑰',
+        'api_key_secure': '您的密鑰安全保存在您的設備上，永遠不會被分享。',
+        'api_key_placeholder': '在此貼上您的 Gemini API 密鑰',
+        'save_key': '保存密鑰',
+        'get_api_key': '🔑 從 AI Studio 取得您的 API 密鑰',
+        'signin_google': '使用 Google 登入以獲得額外功能（可選）：',
+        'signin_button': '使用 Google 登入',
+        'signed_in_as': '已登入為',
+        'sign_out': '登出',
+        'quick_settings': '快速設定',
+        'dark_mode': '深色模式',
+        'transparent_bg': '半透明背景',
+        'panel_width': '面板寬度',
+        'panel_narrow': '窄',
+        'panel_medium': '中等',
+        'panel_wide': '寬',
+        'auto_summarize': '自動建議摘要',
+        'language': '語言',
+        'save_settings': '保存設定',
+        'shortcut_info': '快速按兩次 / 鍵在任何網站上開啟 MSG',
+        'advanced_settings': '進階設定',
+        
+        // Options
+        'options_title': 'MSG 設定',
+        'api_key_section': 'API 密鑰',
+        'gemini_api_key': 'Gemini API 密鑰',
+        'api_key_secure_server': '您的密鑰安全保存在您的設備上，永遠不會與任何伺服器共享。',
+        'save_api_key': '保存 API 密鑰',
+        'account_section': '帳號',
+        'not_signed_in': '您尚未登入。',
+        'appearance_section': '外觀',
+        'use_dark_mode': '使用深色模式（否則跟隨系統設定）',
+        'use_transparent_bg': '使用半透明背景',
+        'behavior_section': '行為',
+        'panel_width_narrow': '窄 (300px)',
+        'panel_width_medium': '中等 (380px)',
+        'panel_width_wide': '寬 (450px)',
+        'auto_summarize_full': '面板開啟時自動建議摘要',
+        'enable_grounding': '啟用 Google Grounding（透過網路搜尋使回答更準確）',
+        'grounding_when': '何時使用 grounding：',
+        'grounding_auto': '自動（需要時）',
+        'grounding_always': '總是',
+        'grounding_explicit': '僅當使用者要求時',
+        'keyboard_shortcut': '鍵盤快捷鍵',
+        'shortcut_description': '開啟/關閉 MSG 面板：快速按兩次 / 鍵',
+        'save_all_settings': '保存所有設定',
+        'api_key_saved': 'API 密鑰保存成功！',
+        'settings_saved': '設定保存成功！',
+        'signin_successful': '登入成功',
+        'signout_successful': '登出成功',
+        'api_key_set': 'API 密鑰已設定',
+        'invalid_api_key': '請輸入有效的 API 密鑰',
+        'signin_failed': '登入失敗',
+        'signout_failed': '登出錯誤',
+        'chat_title': 'MSG 聊天室',
+        'ask_placeholder': '詢問關於這個頁面的任何內容...',
+        'welcome_message': '您好！我是 MSG，您的網站助手。我已分析此頁面，可協助您透過智慧搜尋理解其內容。',
+        'grounding_enabled_all': '網路搜尋已為所有查詢啟用。',
+        'grounding_enabled_auto': '網路搜尋將在需要時自動使用。',
+        'grounding_enabled_explicit': '當您明確要求時（例如"搜尋..."），網路搜尋可用。',
+        'content_loaded': '內容已載入（{size}KB）。{grounding} 輸入"摘要"以快速瀏覽。',
+        'content_loaded_simple': '內容已載入（{size}KB）。輸入"摘要"以快速瀏覽。',
+        'web_search_indicator': '網路搜尋',
+        'api_key_error': '錯誤：請檢查設定中的 API 密鑰。',
+        'summarize_insert': '摘要網頁',
+        'summarize_btn': '摘要',
+        'clear_chat_btn': '清除聊天'
       }
     };
   }

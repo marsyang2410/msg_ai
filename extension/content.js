@@ -652,8 +652,29 @@ function createChatPanel() {
   inputField = document.createElement('textarea');
   inputField.className = 'msg-input';
   inputField.id = 'msg-chat-input';
-  inputField.name = 'msg-chat-input';
-  inputField.placeholder = i18n ? i18n.t('ask_placeholder') : 'Ask anything about this page...';
+inputField.name = 'msg-chat-input';
+// Set input placeholder using i18n
+inputField.placeholder = i18n ? i18n.t('ask_placeholder') : 'Ask anything about this page...';
+
+// ...existing code...
+
+  // Listen for language changes and update input-wrapper texts
+  chrome.storage.sync.get(['msgSettings'], function(result) {
+    const settings = result.msgSettings || {};
+    const language = settings.language || 'en';
+    if (i18n) {
+      i18n.setLanguage(language);
+      inputField.placeholder = i18n.t('ask_placeholder');
+      summarizeButton.textContent = i18n.t('summarize_btn') || i18n.t('summarize_insert');
+      summarizeButton.setAttribute('aria-label', i18n.t('summarize_btn') || i18n.t('summarize_insert'));
+      summarizeButton.setAttribute('title', i18n.t('summarize_btn') || i18n.t('summarize_insert'));
+      clearChatButton.textContent = i18n.t('clear_chat_btn') || 'Clear Chat';
+      clearChatButton.setAttribute('aria-label', i18n.t('clear_chat_btn') || 'Clear chat history');
+      clearChatButton.setAttribute('title', i18n.t('clear_chat_btn') || 'Clear all chat messages');
+      sendButton.setAttribute('aria-label', i18n.t('send_btn') || 'Send message');
+      sendButton.setAttribute('title', i18n.t('send_btn') || 'Send message (Enter)');
+    }
+  });
   inputField.addEventListener('keydown', function(event) {
     // Submit on Enter (without shift)
     if (event.key === 'Enter' && !event.shiftKey) {
@@ -690,9 +711,24 @@ function createChatPanel() {
   summarizeButton.setAttribute('aria-label', 'Fill summarize text');
   summarizeButton.setAttribute('title', 'Fill "Summarize" in textarea');
   summarizeButton.addEventListener('click', function() {
-    inputField.value = 'Summarize webpage';
+    inputField.value = i18n ? i18n.t('summarize_insert') : 'Summarize webpage';
     inputField.focus();
-    // Trigger input event to resize textarea if needed
+    inputField.dispatchEvent(new Event('input'));
+  });
+
+  // Create clear chat button
+  const clearChatButton = document.createElement('button');
+  clearChatButton.className = 'msg-summarize-btn';
+  clearChatButton.textContent = 'Clear Chat';
+  clearChatButton.setAttribute('aria-label', 'Clear chat history');
+  clearChatButton.setAttribute('title', 'Clear all chat messages');
+  clearChatButton.addEventListener('click', function() {
+    // Remove all message elements from chatContainer
+    while (chatContainer.firstChild) {
+      chatContainer.removeChild(chatContainer.firstChild);
+    }
+    // Optionally clear input field
+    inputField.value = '';
     inputField.dispatchEvent(new Event('input'));
   });
   
@@ -706,11 +742,17 @@ function createChatPanel() {
   
   inputRow.appendChild(inputField);
   
-  // Create button row for summarize and send buttons
+  // Create button row for summarize, clear chat, and send buttons
   const buttonRow = document.createElement('div');
   buttonRow.className = 'msg-button-row';
   
-  buttonRow.appendChild(summarizeButton);
+  // Place summarize and clear chat buttons side by side with 5px gap
+  const summarizeClearWrapper = document.createElement('div');
+  summarizeClearWrapper.style.display = 'inline-flex';
+  summarizeClearWrapper.style.gap = '5px';
+  summarizeClearWrapper.appendChild(summarizeButton);
+  summarizeClearWrapper.appendChild(clearChatButton);
+  buttonRow.appendChild(summarizeClearWrapper);
   buttonRow.appendChild(sendButton);
   
   inputWrapper.appendChild(inputRow);
@@ -874,11 +916,12 @@ function getLanguageInstruction() {
     'fr': 'French', 
     'de': 'German',
     'zh': 'Chinese',
+    'zh_tw': 'Traditional Chinese',
     'it': 'Italian',
     'pt': 'Portuguese',
     'ja': 'Japanese',
     'ko': 'Korean',
-    'ru': 'Russian'
+    'ru': 'Russian',
   };
   
   const currentLang = i18n.currentLanguage || 'en';
@@ -906,7 +949,7 @@ INSTRUCTIONS:
 1. You have ALL the page content above - never ask for more.
 2. Never ask for URLs or text - you already have everything.
 3. Your task is to understand the content of the webpage and allow user to ask questions about it.
-4. You may have access to web search (grounding) capabilities to answer questions that go beyond the content on the page. If you use this, cite your sources.
+4. You have access to web search (grounding) capabilities to answer questions that go beyond the content on the page. If you use this, cite your sources.
 5. For summaries, follow this EXACT format structure in any language:
 
    "[Create a short, high-level title summarizing the overall content]"
@@ -961,27 +1004,22 @@ INSTRUCTIONS:
 function addMessage(role, content) {
   // Add to messages array
   chatMessages.push({ role, content });
-  
+
   // Create message element
   const messageElement = document.createElement('div');
   messageElement.className = 'msg-message msg-' + role + '-message';
-  
-  // Format content if it's from the assistant
+
   if (role === 'assistant') {
-    // Process formatting
+    // ...existing code...
     const formattedContent = formatMessageContent(content);
     messageElement.innerHTML = formattedContent;
-    
-    // Check if this is a grounded response
-    const isGrounded = content.includes('[1]') || 
-                       content.includes('[source:') || 
-                       content.includes('Source:') ||
-                       (content.includes('(http') && content.includes(')'));
-    
+    // ...existing code...
+    const isGrounded =  content.includes('[1]') || 
+                        content.includes('[source:') || 
+                        content.includes('Source:') ||
+                        (content.includes('(http') && content.includes(')'));
     if (isGrounded) {
       messageElement.classList.add('msg-message-grounded');
-      
-      // Add grounding indicator
       const groundingIndicator = document.createElement('span');
       groundingIndicator.className = 'msg-grounding-indicator';
       groundingIndicator.textContent = i18n ? i18n.t('web_search_indicator') : 'Web Search';
@@ -990,8 +1028,10 @@ function addMessage(role, content) {
   } else {
     // For user messages, just use text content (no formatting)
     messageElement.textContent = content;
+
+    // Removed Edit button logic
   }
-  
+
   // Add to container
   chatContainer.appendChild(messageElement);
 
@@ -1027,10 +1067,10 @@ function addVisualMessage(role, content) {
     messageElement.innerHTML = formattedContent;
     
     // Check if this is a grounded response
-    const isGrounded = content.includes('[1]') || 
-                       content.includes('[source:') || 
-                       content.includes('Source:') ||
-                       (content.includes('(http') && content.includes(')'));
+    const isGrounded =  content.includes('[1]') || 
+                        content.includes('[source:') || 
+                        content.includes('Source:') ||
+                        (content.includes('(http') && content.includes(')'));
     
     if (isGrounded) {
       messageElement.classList.add('msg-message-grounded');
@@ -1788,8 +1828,12 @@ async function sendToGemini(userMessage, messageAlreadyAdded = false) {
       // Add assistant response to chat
       addMessage('assistant', response.response);
     } else {
-      // Add error message
-      const errorMsg = response?.error || (i18n ? i18n.t('api_key_error') : 'Error: Please check your API key in settings.');
+      // Add user-friendly error message for Gemini API errors
+      let errorMsg = response?.error || (i18n ? i18n.t('api_key_error') : 'Error: Please check your API key in settings.');
+      // If Gemini API returns a generic error, show a helpful message
+      if (errorMsg && errorMsg.toLowerCase().includes('internal error')) {
+        errorMsg = 'An internal error occurred with Gemini API. Please retry in a few seconds, or report the issue at https://developers.generativeai.google/guide/troubleshooting.';
+      }
       addMessage('assistant', errorMsg);
     }
   });
