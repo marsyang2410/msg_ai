@@ -1186,7 +1186,7 @@ function processTableRows(rows) {
   return html;
 }
 
-  // Format message content with basic Markdown-like syntax
+  // Format message content with improved streaming parsing for consistent list rendering
 function formatMessageContent(content) {
   if (!content) return '';
   
@@ -1201,31 +1201,112 @@ function formatMessageContent(content) {
                     safeContent.includes('(http') || 
                     safeContent.includes('(www.');
   
+  // STEP 1: Normalize and clean content structure
+  safeContent = normalizeContentStructure(safeContent);
+  
+  // STEP 2: Format special elements (links, citations, sources)
+  safeContent = formatSpecialElements(safeContent);
+  
+  // STEP 3: Format basic markdown elements
+  safeContent = formatBasicMarkdown(safeContent);
+  
+  // STEP 4: Process structured content with streaming approach
+  const htmlContent = processStructuredContent(safeContent);
+  
+  return htmlContent;
+}
+
+// Normalize content structure to handle mixed formatting from LLM
+function normalizeContentStructure(content) {
+  // Split content into logical sections
+  const lines = content.split('\n');
+  const normalizedLines = [];
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+    
+    // Detect and normalize list-like patterns from LLM
+    const listItem = detectAndNormalizeListItem(line);
+    if (listItem) {
+      normalizedLines.push(listItem);
+    } else {
+      normalizedLines.push(line);
+    }
+  }
+  
+  return normalizedLines.join('\n');
+}
+
+// Detect and normalize various list item patterns that LLMs might produce
+function detectAndNormalizeListItem(line) {
+  // Pattern 1: Content wrapped in <em> tags (often used by LLMs for emphasis in lists)
+  const emPattern = /^(.{0,10})<em>\s*(.+?)\s*<\/em>(.*)$/;
+  if (emPattern.test(line)) {
+    const match = line.match(emPattern);
+    const [, prefix, content, suffix] = match;
+    
+    // If this looks like a list item (has colons, descriptions), normalize it
+    if (content.includes('：') || content.includes(':') || (prefix.trim() === '' && suffix.trim() === '')) {
+      return `- ${content}${suffix}`;
+    }
+  }
+  
+  // Pattern 2: Already bullet points (-, •, *)
+  if (/^\s*[-•*]\s+/.test(line)) {
+    return line.replace(/^\s*[-•*]\s+/, '- ');
+  }
+  
+  // Pattern 3: Numbered items (1. 2. etc)
+  if (/^\s*\d+\.\s+/.test(line)) {
+    return line; // Keep as is for ordered lists
+  }
+  
+  // Pattern 4: Content that looks like list items (contains company names, descriptions with colons)
+  if (isImplicitListItem(line)) {
+    return `- ${line}`;
+  }
+  
+  return null; // Not a list item
+}
+
+// Detect if content looks like an implicit list item
+function isImplicitListItem(line) {
+  // Look for patterns common in company/item descriptions
+  const listItemPatterns = [
+    /^[A-Za-z\u4e00-\u9fff]+[（(][^)）]*[)）][：:]/, // Company名稱（描述）：
+    /^[A-Za-z\u4e00-\u9fff\s]+[：:]\s*.{20,}/, // 名稱：長描述
+  ];
+  
+  return listItemPatterns.some(pattern => pattern.test(line));
+}
+
+// Format special elements like links, citations, and sources
+function formatSpecialElements(content) {
   // Format links - [text](url)
-  safeContent = safeContent.replace(
+  content = content.replace(
     /\[([^\]]+)\]\(([^)]+)\)/g,
     '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
   );
   
-  // Format source citations - [1] or [2], etc. (enhanced for grounding)
-  safeContent = safeContent.replace(
+  // Format source citations - [1] or [2], etc.
+  content = content.replace(
     /\[(\d+(?:,\d+)*)\]/g, 
     '<sup class="msg-citation" data-citation="$1">[$1]</sup>'
   );
   
   // Format **Sources:** section specially
-  safeContent = safeContent.replace(
+  content = content.replace(
     /\*\*Sources:\*\*([\s\S]*?)(?=\n\n|\n*$)/g,
     '<div class="msg-sources"><strong>Sources:</strong>$1</div>'
   );
   
-  // Within Sources section, format as a clean inline list
-  safeContent = safeContent.replace(
+  // Within Sources section, format as clean inline list
+  content = content.replace(
     /<div class="msg-sources">([\s\S]*?)<\/div>/g,
-    function(match, content) {
-      // Extract all source entries and format them as a clean inline list
-      const sourceMatches = content.match(/\[(\d+)\]\s*([^:]+):\s*(https?:\/\/[^\s\n]+)/g);
-      const fallbackMatches = content.match(/\[(\d+)\]\s*(https?:\/\/[^\s\n]+)/g);
+    function(match, sourceContent) {
+      const sourceMatches = sourceContent.match(/\[(\d+)\]\s*([^:]+):\s*(https?:\/\/[^\s\n]+)/g);
+      const fallbackMatches = sourceContent.match(/\[(\d+)\]\s*(https?:\/\/[^\s\n]+)/g);
       
       let formattedSources = '';
       
@@ -1256,214 +1337,147 @@ function formatMessageContent(content) {
     }
   );
   
-  // Format source URLs at the end of response
-  safeContent = safeContent.replace(
-    /\[(\d+)\]:\s*(https?:\/\/[^\s]+)/g,
-    '<div class="msg-source-link">[<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>] $2</div>'
-  );
+  // Format source URLs and other source patterns
+  content = content.replace(/\[(\d+)\]:\s*(https?:\/\/[^\s]+)/g,
+    '<div class="msg-source-link">[<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>] $2</div>');
   
-  // Handle "Source: URL" format
-  safeContent = safeContent.replace(
-    /Source:\s*(https?:\/\/[^\s]+)/gi,
-    '<div class="msg-source-link">Source: <a href="$1" target="_blank" rel="noopener noreferrer">$1</a></div>'
-  );
+  content = content.replace(/Source:\s*(https?:\/\/[^\s]+)/gi,
+    '<div class="msg-source-link">Source: <a href="$1" target="_blank" rel="noopener noreferrer">$1</a></div>');
   
-  // Format bold - **text**
-  safeContent = safeContent.replace(
-    /\*\*([^*]+)\*\*/g,
-    '<strong>$1</strong>'
-  );
+  return content;
+}
+
+// Format basic markdown elements
+function formatBasicMarkdown(content) {
+  let hasQuotedTitle = false;
   
-  // Format italic - *text*
-  safeContent = safeContent.replace(
-    /(?<!\*)\*([^*]+)\*(?!\*)/g,
-    '<em>$1</em>'
-  );
+  // Format quoted titles (content in quotes at start) - improved pattern
+  content = content.replace(/^[「"]([^」"]+)[」"]/m, function(match, title) {
+    hasQuotedTitle = true;
+    return `<h1>${title}</h1>`;
+  });
   
-  // Format code blocks - ```code```
-  safeContent = safeContent.replace(
-    /```([^`]+)```/g,
-    '<pre><code>$1</code></pre>'
-  );
+  // Also handle regular English quotes
+  content = content.replace(/^"([^"]+)"/m, function(match, title) {
+    hasQuotedTitle = true;
+    return `<h1>${title}</h1>`;
+  });
   
-  // Format inline code - `code`
-  safeContent = safeContent.replace(
-    /`([^`]+)`/g,
-    '<code>$1</code>'
-  );
+  // Format bold text (**text**) - use h3 for headers only if there's a quoted title, otherwise use <strong>
+  if (hasQuotedTitle) {
+    // If we have a quoted title, treat **text** as section headers (h3)
+    content = content.replace(/\*\*([^*]+)\*\*/g, '<h3>$1</h3>');
+  } else {
+    // If no quoted title, treat **text** as regular bold text
+    content = content.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  }
   
-  // Format tables - Markdown table syntax
-  safeContent = formatTables(safeContent);
+  // Format code blocks before inline formatting
+  content = content.replace(/```([^`]+)```/g, '<pre><code>$1</code></pre>');
+  content = content.replace(/`([^`]+)`/g, '<code>$1</code>');
   
-  // Additional formatting for blockquotes
-  safeContent = safeContent.replace(
-    /^\s*>\s+(.+)$/gm,
-    '<blockquote>$1</blockquote>'
-  );
+  // Format tables
+  content = formatTables(content);
   
-  // Handle the custom format structure - updated for new format
+  // Format blockquotes
+  content = content.replace(/^\s*>\s+(.+)$/gm, '<blockquote>$1</blockquote>');
   
-  // Handle quotes for title (treat any quoted text at beginning of content as title)
-  safeContent = safeContent.replace(
-    /^"([^"]+)"/m,
-    '<h1>$1</h1>'
-  );
-  
-  // Handle bold section headers (any text between ** and **)
-  safeContent = safeContent.replace(
-    /\*\*([^*]+)\*\*/g,
-    '<h2>$1</h2>'
-  );
-  
-  // Handle bullet points (lines starting with - or • or *)
-  safeContent = safeContent.replace(
-    /(?:^|\n)\s*[-•*]\s+(.+)(?:\n|$)/gm,
-    '\n<li>$1</li>\n'
-  );
-  
-  // Handle legacy format patterns just in case
-  safeContent = safeContent.replace(
-    /(?:")?Heading1-\s*([^"]+)(?:")?/g,
-    '<h1>$1</h1>'
-  );
-  
-  safeContent = safeContent.replace(
-    /(?:")?Heading2-\s*([^"]+)(?:")?/g,
-    '<h2>$1</h2>'
-  );
-  
-  // Split content into lines for list processing
-  const lines = safeContent.split('\n');
-  let formattedLines = [];
-  let inList = false;
-  let listType = '';
-  let consecutiveLiCount = 0;
-  
-  // First pass: Collect all <li> elements and wrap them with proper list tags
-  let processedContent = [];
-  let collectingList = false;
+  return content;
+}
+
+// Process structured content using streaming approach for consistent rendering
+function processStructuredContent(content) {
+  const lines = content.split('\n').filter(line => line.trim() !== '');
+  const result = [];
   let currentListItems = [];
+  let currentListType = null;
   
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
     
-    if (line.match(/<li>.+<\/li>/)) {
-      // Found a list item
-      if (!collectingList) {
-        collectingList = true;
-      }
-      currentListItems.push(line);
-    } else {
-      if (collectingList && currentListItems.length > 0) {
-        // End of list, add the collected items wrapped in ul tags
-        processedContent.push('<ul>' + currentListItems.join('') + '</ul>');
-        currentListItems = [];
-        collectingList = false;
-      }
-      // Add non-list content, but skip empty lines
-      if (line.length > 0) {
-        processedContent.push(line);
-      }
-    }
-  }
-  
-  // Don't forget any remaining list items
-  if (collectingList && currentListItems.length > 0) {
-    processedContent.push('<ul>' + currentListItems.join('') + '</ul>');
-  }
-  
-  // Now process the content with lists already properly formed
-  safeContent = processedContent.join('\n');
-  
-  // Continue with regular formatting for other elements
-  const processedLines = safeContent.split('\n').filter(line => line.trim() !== ''); // Remove empty lines
-  for (let i = 0; i < processedLines.length; i++) {
-    const line = processedLines[i].trim();
+    // Check what type of content this line represents
+    const lineType = identifyLineType(line);
     
-    // Check for ordered list item (1. Item)
-    if (line.match(/^\d+\.\s+.+/)) {
-      if (!inList || listType !== 'ol') {
-        if (inList) {
-          // Close previous list if it exists
-          formattedLines.push(`</${listType}>`);
+    if (lineType.type === 'list-item') {
+      // Handle list items
+      if (currentListType === null) {
+        currentListType = lineType.listType;
+      } else if (currentListType !== lineType.listType) {
+        // List type changed, close current list and start new one
+        if (currentListItems.length > 0) {
+          result.push(wrapListItems(currentListItems, currentListType));
+          currentListItems = [];
         }
-        // Start a new ordered list
-        formattedLines.push('<ol>');
-        inList = true;
-        listType = 'ol';
-      }
-      // Add list item, stripping the number and dot
-      formattedLines.push(`<li>${line.replace(/^\d+\.\s+/, '')}</li>`);
-    } 
-    // Already formed lists with <ul> tags (from first pass)
-    else if (line.match(/<ul>/) || line.match(/<\/ul>/) || line.match(/<li>.+<\/li>/)) {
-      if (line.match(/<ul>/)) {
-        formattedLines.push(line);
-      } else if (line.match(/<\/ul>/)) {
-        formattedLines.push(line);
-      } else {
-        formattedLines.push(line);
-      }
-    }
-    // Check for unordered list item (- Item or • Item or * Item)
-    else if (line.match(/^[-•*]\s+.+/)) {
-      if (!inList || listType !== 'ul') {
-        if (inList) {
-          // Close previous list if it exists
-          formattedLines.push(`</${listType}>`);
-        }
-        // Start a new unordered list
-        formattedLines.push('<ul>');
-        inList = true;
-        listType = 'ul';
+        currentListType = lineType.listType;
       }
       
-      // Add list item, stripping the dash, bullet or asterisk
-      formattedLines.push(`<li>${line.replace(/^[-•*]\s+/, '')}</li>`);
-    } 
-    // Check for headings (# Heading) or our custom <h1> and <h2> tags
-    else if (line.match(/^#+\s+.+/) || line.match(/<h[12]>.+<\/h[12]>/)) {
-      if (inList) {
-        // Close any open list
-        formattedLines.push(`</${listType}>`);
-        inList = false;
+      currentListItems.push(lineType.content);
+    } else {
+      // Not a list item, close any open list first
+      if (currentListItems.length > 0) {
+        result.push(wrapListItems(currentListItems, currentListType));
+        currentListItems = [];
+        currentListType = null;
       }
       
-      if (line.match(/<h[12]>.+<\/h[12]>/)) {
-        // It's already a heading tag, add it as is
-        formattedLines.push(line);
-      } else {
-        // Convert markdown heading
-        const level = Math.min(line.match(/^#+/)[0].length, 3); // Limit to h1-h3
-        const headingText = line.replace(/^#+\s+/, '');
-        formattedLines.push(`<h${level}>${headingText}</h${level}>`);
-      }
-    } 
-    // Regular paragraph text
-    else {
-      if (inList) {
-        // Close any open list when a non-list item is encountered
-        formattedLines.push(`</${listType}>`);
-        inList = false;
-      }
-      
-      if (line.length > 0) {
-        formattedLines.push(`<p>${line}</p>`);
-      }
-      // Removed the else condition that added <br> for empty lines
+      // Process non-list content
+      result.push(formatNonListContent(line, lineType));
     }
   }
   
-  // Close any open list at the end
-  if (inList) {
-    formattedLines.push(`</${listType}>`);
+  // Close any remaining open list
+  if (currentListItems.length > 0) {
+    result.push(wrapListItems(currentListItems, currentListType));
   }
   
-  // Join all formatted lines and remove any potential empty HTML elements
-  return formattedLines.join('')
-    .replace(/<p>\s*<\/p>/g, '') // Remove empty paragraphs
-    .replace(/<br><br>/g, '<br>') // Remove consecutive breaks
-    .replace(/>\s+</g, '><'); // Remove whitespace between tags
+  return result.join('').replace(/>\s+</g, '><'); // Clean up whitespace
+}
+
+// Identify the type of content line
+function identifyLineType(line) {
+  // Check for headers
+  if (line.match(/<h[1-6]>/)) {
+    return { type: 'header', content: line };
+  }
+  
+  // Check for ordered list items
+  if (line.match(/^\d+\.\s+/)) {
+    const content = line.replace(/^\d+\.\s+/, '');
+    return { type: 'list-item', listType: 'ordered', content };
+  }
+  
+  // Check for unordered list items (normalized to -)
+  if (line.match(/^-\s+/)) {
+    const content = line.replace(/^-\s+/, '');
+    return { type: 'list-item', listType: 'unordered', content };
+  }
+  
+  // Check for special content blocks
+  if (line.match(/^<(div|pre|blockquote)/)) {
+    return { type: 'block', content: line };
+  }
+  
+  // Default to paragraph
+  return { type: 'paragraph', content: line };
+}
+
+// Wrap list items with appropriate HTML tags
+function wrapListItems(items, listType) {
+  const tag = listType === 'ordered' ? 'ol' : 'ul';
+  const listItems = items.map(item => `<li>${item}</li>`).join('');
+  return `<${tag}>${listItems}</${tag}>`;
+}
+
+// Format non-list content based on its type
+function formatNonListContent(line, lineType) {
+  switch (lineType.type) {
+    case 'header':
+    case 'block':
+      return lineType.content;
+    case 'paragraph':
+    default:
+      return line.length > 0 ? `<p>${line}</p>` : '';
+  }
 }
 
 // Show loading indicator
