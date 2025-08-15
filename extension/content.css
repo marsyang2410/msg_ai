@@ -1,4 +1,3 @@
-
 /* CSS Reset for MSG elements to prevent website styles from affecting the extension */
 #msg-chat-panel,
 #msg-floating-icon {
@@ -510,6 +509,7 @@
 
 #msg-chat-panel .msg-send-btn {
   background-color: #D4A373 !important;
+  background-image: none !important; /* Prevent any background image from being applied */
   color: white !important;
   border: none !important;
   width: 32px !important;
@@ -522,6 +522,7 @@
   font-size: 16px !important;
   transition: background-color 0.2s ease !important;
   z-index: 10 !important;
+  box-shadow: none !important; /* Prevent any box-shadow from being applied */
 }
 
 #msg-chat-panel .msg-send-btn:hover {
@@ -531,7 +532,8 @@
 
 /* Summarize button */
 #msg-chat-panel .msg-summarize-btn {
-  background-color: #fff !important;
+  background-color: #fff !important; /* Fixed light gray color */
+  background-image: none !important; /* Prevent any background image from being applied */
   color: #333 !important;
   border: 1px solid #D9D9D9 !important;
   border-radius: 16px !important;
@@ -547,6 +549,7 @@
   justify-content: center !important;
   height: 36px !important;
   box-sizing: border-box !important;
+  box-shadow: none !important; /* Prevent any box-shadow from being applied */
 }
 
 #msg-chat-panel .msg-summarize-btn:hover {
@@ -690,6 +693,7 @@
     justify-content: center !important;
     height: 36px !important;
     box-sizing: border-box !important;
+    box-shadow: none !important; /* Prevent any box-shadow from being applied */
   }
   
   #msg-chat-panel .msg-summarize-btn:hover {
